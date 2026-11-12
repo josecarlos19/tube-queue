@@ -18,7 +18,7 @@ function urlForView(view) {
   return view === 'feed' ? location.pathname : `${location.pathname}?view=${view}`;
 }
 
-const state = { language: 'en', theme: 'light', channels: [], videos: [], history: [], view: viewFromUrl(), player: null, selectedHistory: new Set(), feedLayout: readFeedLayout(), showLastSync: true, selectingChannels: false, selectedChannels: new Set(), settings: {} };
+const state = { language: 'en', theme: 'light', channels: [], videos: [], history: [], view: viewFromUrl(), player: null, selectedHistory: new Set(), feedLayout: readFeedLayout(), showLastSync: true, recordHistory: true, selectingChannels: false, selectedChannels: new Set(), settings: {} };
 const t = createTranslator(() => state.language);
 
 let noticeTimer;
@@ -81,6 +81,8 @@ function applyTranslations() {
     button.setAttribute('aria-checked', String(button.dataset.language === state.language));
   });
   $('#show-last-sync').setAttribute('aria-checked', String(state.showLastSync));
+  $('#record-history').setAttribute('aria-checked', String(state.recordHistory));
+  document.querySelector('.nav-item[data-view="history"]').classList.toggle('hidden', !state.recordHistory);
   $('#theme-icon').textContent = state.theme === 'dark' ? '☀' : '☾';
   document.body.dataset.theme = state.theme;
   document.querySelector('meta[name="theme-color"]').content = state.theme === 'dark' ? '#0f0f0f' : '#f9f9f9';
@@ -266,7 +268,15 @@ function showView(view) {
   $('#settings-view').classList.toggle('hidden', view !== 'settings');
 }
 
-function setView(view, { updateUrl = true } = {}) {
+function availableView(view) {
+  return view === 'history' && !state.recordHistory ? 'feed' : view;
+}
+
+function setView(requestedView, { updateUrl = true } = {}) {
+  const view = availableView(requestedView);
+  if (view !== requestedView) {
+    history.replaceState({ view }, '', urlForView(view));
+  }
   state.view = view;
   const url = urlForView(view);
   if (updateUrl && `${location.pathname}${location.search}` !== url) {
@@ -287,7 +297,11 @@ function createPlayer(videoId) {
   if (!$('#youtube-player')) {
     return;
   }
-  const recordPlayback = (playbackState) => postJson('/api/history', { videoId, state: playbackState }).catch(() => {});
+  const recordPlayback = (playbackState) => {
+    if (state.recordHistory) {
+      postJson('/api/history', { videoId, state: playbackState }).catch(() => {});
+    }
+  };
   try {
     state.player = new window.YT.Player('youtube-player', {
       width: '100%',
@@ -327,7 +341,9 @@ function openPlayer(videoId) {
   if (!video) {
     return;
   }
-  postJson('/api/history', { videoId, state: 'opened' }).catch(() => {});
+  if (state.recordHistory) {
+    postJson('/api/history', { videoId, state: 'opened' }).catch(() => {});
+  }
   $('#player-title').textContent = video.title;
   $('#player-channel').textContent = video.channel_title;
   $('#youtube-link').href = `https://www.youtube.com/watch?v=${encodeURIComponent(video.video_id)}`;
@@ -350,7 +366,7 @@ function readCachedPreferences() {
 
 function cachePreferences() {
   try {
-    localStorage.setItem(preferenceStorageKey, JSON.stringify({ language: state.language, theme: state.theme, showLastSync: state.showLastSync }));
+    localStorage.setItem(preferenceStorageKey, JSON.stringify({ language: state.language, theme: state.theme, showLastSync: state.showLastSync, recordHistory: state.recordHistory }));
   } catch {}
 }
 
@@ -540,9 +556,16 @@ function bindEvents() {
   $('#channel-form').addEventListener('submit', submitChannel);
   $('#cancel-channel').addEventListener('click', () => $('#channel-dialog').close());
   $('#save-api-key').addEventListener('click', saveApiKey);
+  $('#record-history').addEventListener('click', async () => {
+    state.recordHistory = !state.recordHistory;
+    applyTranslations();
+    await savePreference('recordHistory', state.recordHistory);
+  });
   $('#show-last-sync').addEventListener('click', async () => {
     state.showLastSync = !state.showLastSync;
     $('#show-last-sync').setAttribute('aria-checked', String(state.showLastSync));
+  $('#record-history').setAttribute('aria-checked', String(state.recordHistory));
+  document.querySelector('.nav-item[data-view="history"]').classList.toggle('hidden', !state.recordHistory);
     renderLastSync();
     await savePreference('showLastSync', state.showLastSync);
   });
@@ -652,9 +675,10 @@ async function start() {
   state.language = cached.language || (navigator.language.toLowerCase().startsWith('pt') ? 'pt-BR' : 'en');
   state.theme = cached.theme || 'light';
   state.showLastSync = cached.showLastSync !== false;
+  state.recordHistory = cached.recordHistory !== false;
   applyTranslations();
   renderFeedLayout();
-  showView(state.view);
+  showView(availableView(state.view));
   delete document.documentElement.dataset.loading;
   historyRangePicker = createDateRangePicker($('#history-range'), { language: state.language, onChange: () => loadHistory().catch(showError) });
   try {
@@ -662,6 +686,7 @@ async function start() {
     state.language = state.settings.language || state.language;
     state.theme = state.settings.theme || state.theme;
     state.showLastSync = state.settings.showLastSync !== false;
+    state.recordHistory = state.settings.recordHistory !== false;
     cachePreferences();
     applyTranslations();
     await loadChannels();

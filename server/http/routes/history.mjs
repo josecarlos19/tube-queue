@@ -14,7 +14,7 @@ function toInstant(value) {
   return date.toISOString();
 }
 
-export function historyRoutes({ repository, now }) {
+export function historyRoutes({ repository, settings, now }) {
   return [
     {
       method: 'GET', path: '/api/history',
@@ -34,9 +34,12 @@ export function historyRoutes({ repository, now }) {
         if (!videoId || !repository.videoExists(videoId)) {
           return json(res, 404, { error: 'Video not found in the local feed.' });
         }
+        if (!settings.recordHistory()) {
+          return json(res, 200, { ok: true, recorded: false });
+        }
         const playbackState = playbackStates.includes(body.state) ? body.state : 'opened';
         repository.recordPlayback(videoId, playbackState, now().toISOString());
-        json(res, 200, { ok: true });
+        json(res, 200, { ok: true, recorded: true });
       }
     },
     {

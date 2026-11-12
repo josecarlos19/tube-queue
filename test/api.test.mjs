@@ -207,6 +207,27 @@ test('the last sync time can be hidden and shown again', async (t) => {
   assert.equal((await app.request('POST', '/api/settings', { body: { showLastSync: true } })).data.showLastSync, true);
 });
 
+test('with history turned off, playback is not recorded but marking as watched still works', async (t) => {
+  const app = await startTestApp({ youtube: youtubeWithChannels() });
+  t.after(app.close);
+  await addBoth(app);
+  assert.equal((await app.request('GET', '/api/settings')).data.recordHistory, true);
+
+  await app.request('POST', '/api/history', { body: { videoId: 'a1', state: 'opened' } });
+  assert.equal((await app.request('POST', '/api/settings', { body: { recordHistory: false } })).data.recordHistory, false);
+
+  const ignored = await app.request('POST', '/api/history', { body: { videoId: 'a2', state: 'started' } });
+  assert.deepEqual(ignored.data, { ok: true, recorded: false });
+  await app.request('POST', '/api/history/mark', { body: { videoId: 'b1' } });
+
+  const history = (await app.request('GET', '/api/history')).data.history;
+  assert.deepEqual(history.map((row) => row.video_id).sort(), ['a1', 'b1']);
+
+  await app.request('POST', '/api/settings', { body: { recordHistory: true } });
+  const recorded = await app.request('POST', '/api/history', { body: { videoId: 'a2', state: 'started' } });
+  assert.deepEqual(recorded.data, { ok: true, recorded: true });
+});
+
 test('settings never return the API key', async (t) => {
   const app = await startTestApp();
   t.after(app.close);

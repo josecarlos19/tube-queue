@@ -12,6 +12,7 @@ export function createSettingsStore(db, credentialDefaults) {
     apiKey: () => get('api_key', credentialDefaults.apiKey).trim(),
     language: () => get('language', 'en'),
     theme: () => get('theme', 'light'),
-    showLastSync: () => get('show_last_sync', 'true') === 'true'
+    showLastSync: () => get('show_last_sync', 'true') === 'true',
+    recordHistory: () => get('record_history', 'true') === 'true'
   };
 }

@@ -8,7 +8,8 @@ export function settingsRoutes({ settings }) {
     hasApiKey: Boolean(settings.apiKey()),
     language: settings.language(),
     theme: settings.theme(),
-    showLastSync: settings.showLastSync()
+    showLastSync: settings.showLastSync(),
+    recordHistory: settings.recordHistory()
   });
 
   return [
@@ -33,6 +34,9 @@ export function settingsRoutes({ settings }) {
         }
         if (typeof body.showLastSync === 'boolean') {
           settings.save('show_last_sync', body.showLastSync);
+        }
+        if (typeof body.recordHistory === 'boolean') {
+          settings.save('record_history', body.recordHistory);
         }
         json(res, 200, payload());
       }
