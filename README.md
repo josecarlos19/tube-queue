@@ -30,8 +30,11 @@
 - 📺 **One chronological feed** of the channels you add, grouped by day, in grid, list or channel rows
 - 🚫 **No Shorts**, unless you want them
 - 🔄 **Background sync** on a schedule you pick
-- ▶️ **Built-in player**, with a link to YouTube for likes and comments
+- 🗂️ **Channel groups** to filter the feed by topic
+- ▶️ **Built-in player** with theater mode and optional autoplay of the next video, with a link to YouTube for likes and comments
+- 📋 **Play queue**: drag to reorder, repeat, clear with one click, optionally floating on every page
 - ✅ **Watch tracking** and an optional **history** you can filter by date
+- 🪶 **Data saver** mode that loads much lighter thumbnails
 - 🔎 **Instant search** across videos and channels
 - 📥 **CSV import/export** of your channel list
 - 🌗 **Light and dark themes**, in English and Brazilian Portuguese

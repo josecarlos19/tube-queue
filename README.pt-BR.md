@@ -30,8 +30,11 @@
 - 📺 **Um feed cronológico** dos canais que você adicionar, agrupado por dia, em grade, lista ou fileiras por canal
 - 🚫 **Sem Shorts**, a menos que você queira
 - 🔄 **Sincronização em segundo plano** no intervalo que você escolher
-- ▶️ **Player integrado**, com link para o YouTube para curtir e comentar
+- 🗂️ **Grupos de canais** para filtrar o feed por assunto
+- ▶️ **Player integrado** com modo teatro e reprodução automática opcional do próximo vídeo, com link para o YouTube para curtir e comentar
+- 📋 **Fila de reprodução**: arraste para reordenar, repita e limpe com um clique, opcionalmente flutuante em todas as páginas
 - ✅ **Marcação de vídeos vistos** e **histórico** opcional com filtro por data
+- 🪶 **Modo econômico** que carrega miniaturas bem mais leves
 - 🔎 **Busca instantânea** em vídeos e canais
 - 📥 **Importação e exportação** da lista de canais em CSV
 - 🌗 **Temas claro e escuro**, em português e inglês
