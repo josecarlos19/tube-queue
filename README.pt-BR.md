@@ -33,7 +33,7 @@
 **Docker**
 
 ```sh
-git clone <url-do-repositorio> tubequeue && cd tubequeue
+git clone https://github.com/josecarlos19/tube-queue.git tubequeue && cd tubequeue
 cp .env.example .env
 docker compose up -d --build
 ```
@@ -41,7 +41,7 @@ docker compose up -d --build
 **Node.js** (versão fixada no `.nvmrc`)
 
 ```sh
-git clone <url-do-repositorio> tubequeue && cd tubequeue
+git clone https://github.com/josecarlos19/tube-queue.git tubequeue && cd tubequeue
 nvm install
 npm start
 ```
