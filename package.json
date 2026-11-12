@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "node server/index.mjs",
+    "dev": "node --watch-path=server server/index.mjs --dev",
     "test": "node --test \"test/**/*.test.mjs\""
   },
   "license": "MIT"

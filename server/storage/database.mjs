@@ -34,6 +34,11 @@ const schema = `
     manually_watched INTEGER NOT NULL DEFAULT 0
   );
   CREATE INDEX IF NOT EXISTS history_activity_idx ON watch_history(last_activity_at DESC);
+  CREATE TABLE IF NOT EXISTS play_queue (
+    video_id TEXT PRIMARY KEY REFERENCES videos(video_id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    added_at TEXT NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS settings (
     setting_key TEXT PRIMARY KEY,
     setting_value TEXT NOT NULL

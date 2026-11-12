@@ -88,12 +88,15 @@ test('picks the largest available video thumbnail', async () => {
   assert.deepEqual(videos.map((video) => video.thumbnailUrl), ['s.jpg', 'x.jpg']);
 });
 
-test('lists short IDs from the channel shorts playlist and treats a missing one as empty', async () => {
-  const { fetch, requests } = fakeFetch((url, count) => count === 1
-    ? { body: { items: [{ contentDetails: { videoId: 's1' } }, { contentDetails: {} }] } }
-    : { status: 404, body: { error: { message: 'playlistNotFound' } } });
+test('pages through a playlist up to the limit and can treat a missing playlist as empty', async () => {
+  const page = (ids, nextPageToken) => ({ body: { nextPageToken, items: ids.map((id) => ({ snippet: { title: id }, contentDetails: { videoId: id } })) } });
+  const { fetch, requests } = fakeFetch((url) => url.searchParams.get('pageToken') === 'p2' ? page(['v3'], 'p3') : page(['v1', 'v2'], 'p2'));
   const youtube = createYouTubeClient({ settings: fakeSettings(), fetch });
-  assert.deepEqual(await youtube.listRecentShortIds(channelId), ['s1']);
-  assert.equal(requests[0].searchParams.get('playlistId'), `UUSH${channelId.slice(2)}`);
-  assert.deepEqual(await youtube.listRecentShortIds(channelId), []);
+  assert.deepEqual((await youtube.listRecentUploads('UULF1', { limit: 3 })).map((item) => item.videoId), ['v1', 'v2', 'v3']);
+  assert.deepEqual(requests.map((url) => [url.searchParams.get('maxResults'), url.searchParams.get('pageToken')]), [['3', null], ['1', 'p2']]);
+
+  const missing = fakeFetch(() => ({ status: 404, body: { error: { message: 'playlistNotFound' } } }));
+  const client = createYouTubeClient({ settings: fakeSettings(), fetch: missing.fetch });
+  assert.deepEqual(await client.listRecentUploads('UULV1', { missingIsEmpty: true }), []);
+  await assert.rejects(client.listRecentUploads('UU1'), { status: 404 });
 });

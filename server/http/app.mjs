@@ -4,6 +4,8 @@ import { settingsRoutes } from './routes/settings.mjs';
 import { channelRoutes } from './routes/channels.mjs';
 import { videoRoutes } from './routes/videos.mjs';
 import { historyRoutes } from './routes/history.mjs';
+import { queueRoutes } from './routes/queue.mjs';
+import { devRoutes } from './routes/dev.mjs';
 
 function isTrustedWrite(req, baseUrl) {
   if (!String(req.headers['content-type'] || '').startsWith('application/json')) {
@@ -41,7 +43,9 @@ export function createApp(dependencies) {
     ...settingsRoutes(dependencies),
     ...channelRoutes(dependencies),
     ...videoRoutes(dependencies),
-    ...historyRoutes(dependencies)
+    ...historyRoutes(dependencies),
+    ...queueRoutes(dependencies),
+    ...devRoutes(dependencies)
   ];
   const serveStatic = createStaticHandler(dependencies.config.publicDir);
 

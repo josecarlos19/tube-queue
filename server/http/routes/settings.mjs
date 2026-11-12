@@ -3,15 +3,20 @@ import { json, readJson } from '../respond.mjs';
 const languages = ['en', 'pt-BR'];
 const themes = ['light', 'dark'];
 export const syncIntervals = [0, 15, 30, 60, 180];
+export const videosPerChannelOptions = [50, 100, 200];
 
-export function settingsRoutes({ settings }) {
+export function settingsRoutes({ settings, config }) {
   const payload = () => ({
     hasApiKey: Boolean(settings.apiKey()),
+    dev: Boolean(config.dev),
     language: settings.language(),
     theme: settings.theme(),
     showLastSync: settings.showLastSync(),
     recordHistory: settings.recordHistory(),
     hideShorts: settings.hideShorts(),
+    videosPerChannel: settings.videosPerChannel(),
+    floatingQueue: settings.floatingQueue(),
+    dataSaver: settings.dataSaver(),
     markWatchedOnClose: settings.markWatchedOnClose(),
     syncIntervalMinutes: settings.syncIntervalMinutes()
   });
@@ -45,8 +50,17 @@ export function settingsRoutes({ settings }) {
         if (typeof body.hideShorts === 'boolean') {
           settings.save('hide_shorts', body.hideShorts);
         }
+        if (typeof body.floatingQueue === 'boolean') {
+          settings.save('floating_queue', body.floatingQueue);
+        }
+        if (typeof body.dataSaver === 'boolean') {
+          settings.save('data_saver', body.dataSaver);
+        }
         if (typeof body.markWatchedOnClose === 'boolean') {
           settings.save('mark_watched_on_close', body.markWatchedOnClose);
+        }
+        if (videosPerChannelOptions.includes(body.videosPerChannel)) {
+          settings.save('videos_per_channel', body.videosPerChannel);
         }
         if (syncIntervals.includes(body.syncIntervalMinutes)) {
           settings.save('sync_interval_minutes', body.syncIntervalMinutes);

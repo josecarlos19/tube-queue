@@ -24,6 +24,7 @@
     <aside class="sidebar" id="sidebar">
       <nav class="main-nav" aria-label="Main navigation">
         <button class="nav-item active" data-view="feed"><span class="nav-icon">⌂</span><span data-i18n="feed">Feed</span></button>
+        <button class="nav-item" data-view="queue"><span class="nav-icon">≡</span><span data-i18n="queue">Queue</span><span class="nav-count hidden" id="queue-count"></span></button>
         <button class="nav-item" data-view="history"><span class="nav-icon">◷</span><span data-i18n="history">History</span></button>
         <button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span data-i18n="settings">Settings</span></button>
       </nav>
@@ -55,6 +56,14 @@
         <div class="video-grid" id="video-grid"></div>
         <div class="empty-state hidden" id="feed-empty"><div class="empty-art">▶</div><h2 data-i18n="emptyFeedTitle">Your feed starts here</h2><p data-i18n="emptyFeedText">Add the channels you want to follow to fill this feed.</p><button class="button button-primary" data-i18n="addFirstChannel" id="add-first-channel">Add your first channel</button></div>
       </section>
+      <section class="view hidden" id="queue-view">
+        <div class="page-heading">
+          <div><p class="eyebrow" data-i18n="upNext">UP NEXT</p><h1 data-i18n="playQueue">Play queue</h1><p class="subheading" data-i18n="queueDescription">Videos play in this order, one after another.</p></div>
+          <div class="heading-actions"><button class="button button-secondary hidden" id="clear-queue" data-i18n="clearQueue">Clear queue</button><button class="button button-primary hidden" id="play-queue"><span>▶</span><span data-i18n="playQueueButton">Play queue</span></button></div>
+        </div>
+        <div class="history-list" id="queue-list"></div>
+        <div class="empty-state hidden" id="queue-empty"><div class="empty-art">≡</div><h2 data-i18n="emptyQueueTitle">Your queue is empty</h2><p data-i18n="emptyQueueText">Use the queue button on any video to line it up here.</p></div>
+      </section>
       <section class="view hidden" id="history-view">
         <div class="page-heading"><div><p class="eyebrow" data-i18n="yourActivity">YOUR ACTIVITY</p><h1 data-i18n="watchHistory">Watch history</h1><p class="subheading" data-i18n="historyDescription">Videos you opened or marked as watched.</p></div></div>
         <div class="history-toolbar">
@@ -69,7 +78,7 @@
         <div class="page-heading"><div><p class="eyebrow" data-i18n="personalSetup">PERSONAL SETUP</p><h1 data-i18n="settings">Settings</h1><p class="subheading" data-i18n="settingsDescription">Add your YouTube API key so TubeQueue can read public channel and video data.</p></div></div>
         <div class="settings-layout">
           <section class="settings-card">
-            <div class="settings-card-heading"><div class="settings-icon settings-icon-red">⌘</div><div><h2 data-i18n="apiKeyHeading">YouTube API key</h2><p id="api-key-status" class="settings-status"></p></div></div>
+            <div class="settings-card-heading"><div class="settings-icon settings-icon-red"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/></svg></div><div><h2 data-i18n="apiKeyHeading">YouTube API key</h2><p id="api-key-status" class="settings-status"></p></div></div>
             <p class="settings-copy" data-i18n="apiKeyExplanation">TubeQueue uses this key to find channels and fetch their latest uploads. Only public data is read.</p>
             <label class="form-label" for="api-key-input" data-i18n="apiKeyLabel">API key</label><input id="api-key-input" class="text-input" type="password" autocomplete="new-password" placeholder="">
             <p class="settings-hint" data-i18n="apiKeyHint">The key is stored locally in SQLite and used by the server only.</p>
@@ -77,7 +86,7 @@
             <div class="settings-steps"><h3 data-i18n="apiKeyTutorialTitle">Create your own API key</h3><ol><li data-i18n="apiKeyStep1">Create or select a project in Google Cloud Console.</li><li data-i18n="apiKeyStep2">Enable YouTube Data API v3 in APIs & Services → Library.</li><li data-i18n="apiKeyStep3">Create credentials → API key, then restrict it to YouTube Data API v3.</li><li data-i18n="apiKeyStep4">Paste the key above and save. Keep it private.</li></ol><a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" data-i18n="openCloudConsole">Open Google Cloud Console ↗</a></div>
           </section>
           <section class="settings-card">
-            <div class="settings-card-heading"><div class="settings-icon">⇅</div><div><h2 data-i18n="channelsCsvHeading">Channels CSV</h2><p id="channels-csv-status" class="settings-status"></p></div></div>
+            <div class="settings-card-heading"><div class="settings-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></div><div><h2 data-i18n="channelsCsvHeading">Channels CSV</h2><p id="channels-csv-status" class="settings-status"></p></div></div>
             <p class="settings-copy" data-i18n="channelsCsvExplanation">Export your saved channels or import a list. Each row needs a channel @handle, channel URL or channel ID in the "channel" column. Only valid channels are added.</p>
             <div class="button-row">
               <a class="button button-secondary" id="export-channels" href="/api/channels/export" download data-i18n="exportCsv">Export CSV</a>
@@ -88,32 +97,40 @@
             <div class="settings-steps hidden" id="import-report"><h3 id="import-report-title"></h3><ol id="import-report-list"></ol></div>
           </section>
           <section class="settings-card">
-            <div class="settings-card-heading"><div class="settings-icon">⚙</div><div><h2 data-i18n="preferencesHeading">Preferences</h2></div></div>
-            <p class="form-label" id="language-label" data-i18n="language">Language</p>
+            <div class="settings-card-heading"><div class="settings-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></div><div><h2 data-i18n="preferencesHeading">Preferences</h2></div></div>
+            <div class="form-label-row"><span class="setting-icon setting-icon-small"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span><p class="form-label" id="language-label" data-i18n="language">Language</p></div>
             <div class="segmented" role="radiogroup" aria-labelledby="language-label">
               <button type="button" role="radio" data-language="en">English</button>
               <button type="button" role="radio" data-language="pt-BR">Português (Brasil)</button>
             </div>
             <div class="setting-row">
-              <div><p class="setting-row-title" id="show-last-sync-label" data-i18n="showLastSync">Show last sync time</p><p class="settings-hint" data-i18n="showLastSyncHint">Shown under the feed title.</p></div>
+              <span class="setting-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><div class="setting-row-copy"><p class="setting-row-title" id="show-last-sync-label" data-i18n="showLastSync">Show last sync time</p><p class="settings-hint" data-i18n="showLastSyncHint">Shown under the feed title.</p></div>
               <button type="button" class="switch" id="show-last-sync" role="switch" aria-checked="true" aria-labelledby="show-last-sync-label"><span></span></button>
             </div>
             <div class="setting-row">
-              <div><p class="setting-row-title" id="record-history-label" data-i18n="recordHistory">Save watch history</p><p class="settings-hint" data-i18n="recordHistoryHint">When off, videos you open are not saved and the History tab is hidden. Existing history is kept, and marking videos as watched still works.</p></div>
+              <span class="setting-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg></span><div class="setting-row-copy"><p class="setting-row-title" id="record-history-label" data-i18n="recordHistory">Save watch history</p><p class="settings-hint" data-i18n="recordHistoryHint">When off, videos you open are not saved and the History tab is hidden. Existing history is kept, and marking videos as watched still works.</p></div>
               <button type="button" class="switch" id="record-history" role="switch" aria-checked="true" aria-labelledby="record-history-label"><span></span></button>
             </div>
             <div class="setting-row">
-              <div><p class="setting-row-title" id="hide-shorts-label" data-i18n="hideShorts">Hide Shorts</p><p class="settings-hint" data-i18n="hideShortsHint">Only regular videos appear in the feed. Uses one extra API request per channel on each sync.</p></div>
+              <span class="setting-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M3 3l18 18"/></svg></span><div class="setting-row-copy"><p class="setting-row-title" id="hide-shorts-label" data-i18n="hideShorts">Hide Shorts</p><p class="settings-hint" data-i18n="hideShortsHint">Only regular videos appear in the feed. Uses one extra API request per channel on each sync.</p></div>
               <button type="button" class="switch" id="hide-shorts" role="switch" aria-checked="true" aria-labelledby="hide-shorts-label"><span></span></button>
             </div>
             <div class="setting-row">
-              <div><p class="setting-row-title" id="mark-watched-on-close-label" data-i18n="markWatchedOnClose">Mark as watched when closing the player</p><p class="settings-hint" data-i18n="markWatchedOnCloseHint">Closing a video marks it as watched.</p></div>
+              <span class="setting-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h11M4 12h11M4 18h7"/><path d="M17 15l4 3-4 3z"/></svg></span><div class="setting-row-copy"><p class="setting-row-title" id="floating-queue-label" data-i18n="floatingQueue">Floating queue</p><p class="settings-hint" data-i18n="floatingQueueHint">Keeps the play queue in a panel at the bottom corner of every page.</p></div>
+              <button type="button" class="switch" id="floating-queue" role="switch" aria-checked="true" aria-labelledby="floating-queue-label"><span></span></button>
+            </div>
+            <div class="setting-row">
+              <span class="setting-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19c0-8 5-13 15-14-1 10-6 15-14 15"/><path d="M5 19l7-7"/></svg></span><div class="setting-row-copy"><p class="setting-row-title" id="data-saver-label" data-i18n="dataSaver">Data saver</p><p class="settings-hint" data-i18n="dataSaverHint">Loads smaller thumbnails (about 12x lighter) at lower quality.</p></div>
+              <button type="button" class="switch" id="data-saver" role="switch" aria-checked="false" aria-labelledby="data-saver-label"><span></span></button>
+            </div>
+            <div class="setting-row">
+              <span class="setting-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg></span><div class="setting-row-copy"><p class="setting-row-title" id="mark-watched-on-close-label" data-i18n="markWatchedOnClose">Mark as watched when closing the player</p><p class="settings-hint" data-i18n="markWatchedOnCloseHint">Closing a video marks it as watched.</p></div>
               <button type="button" class="switch" id="mark-watched-on-close" role="switch" aria-checked="true" aria-labelledby="mark-watched-on-close-label"><span></span></button>
             </div>
           </section>
           <section class="settings-card">
-            <div class="settings-card-heading"><div class="settings-icon">↻</div><div><h2 data-i18n="syncHeading">Sync</h2></div></div>
-            <p class="form-label" id="sync-interval-label" data-i18n="syncInterval">Automatic sync</p>
+            <div class="settings-card-heading"><div class="settings-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.6-4.5L4 8"/><path d="M4 3v5h5"/><path d="M4 13a8 8 0 0 0 14.6 4.5L20 16"/><path d="M20 21v-5h-5"/></svg></div><div><h2 data-i18n="syncHeading">Sync</h2></div></div>
+            <div class="form-label-row"><span class="setting-icon setting-icon-small"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><p class="form-label" id="sync-interval-label" data-i18n="syncInterval">Automatic sync</p></div>
             <div class="segmented" role="radiogroup" aria-labelledby="sync-interval-label">
               <button type="button" role="radio" data-sync-interval="0" data-i18n="syncOff">Off</button>
               <button type="button" role="radio" data-sync-interval="15">15 min</button>
@@ -122,8 +139,15 @@
               <button type="button" role="radio" data-sync-interval="180">3 h</button>
             </div>
             <p class="settings-hint" data-i18n="syncIntervalHint">The server checks your channels in the background on this schedule, even with the page closed. Each channel costs one API request per sync.</p>
+            <div class="form-label-row"><span class="setting-icon setting-icon-small"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1.5"/><rect x="3" y="11" width="18" height="5" rx="1.5"/><path d="M5 20h14"/></svg></span><p class="form-label" id="videos-per-channel-label" data-i18n="videosPerChannel">Videos per channel</p></div>
+            <div class="segmented" role="radiogroup" aria-labelledby="videos-per-channel-label">
+              <button type="button" role="radio" data-videos-per-channel="50">50</button>
+              <button type="button" role="radio" data-videos-per-channel="100">100</button>
+              <button type="button" role="radio" data-videos-per-channel="200">200</button>
+            </div>
+            <p class="settings-hint" data-i18n="videosPerChannelHint">How many recent videos each sync reads per channel. Every 50 costs one API request per channel.</p>
             <div class="setting-row">
-              <div><p class="setting-row-title" data-i18n="clearCache">Clear video cache</p><p class="settings-hint" data-i18n="clearCacheHint">Removes saved videos and downloads them again. Videos in your history are kept.</p></div>
+              <span class="setting-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg></span><div class="setting-row-copy"><p class="setting-row-title" data-i18n="clearCache">Clear video cache</p><p class="settings-hint" data-i18n="clearCacheHint">Removes saved videos and downloads them again. Videos in your history are kept.</p></div>
               <button type="button" class="button button-secondary" id="clear-cache" data-i18n="clearCacheButton">Clear cache</button>
             </div>
           </section>
@@ -151,9 +175,28 @@
       <div class="modal-actions"><button class="button button-secondary" value="cancel" data-i18n="cancel">Cancel</button><button class="button button-danger" value="confirm" id="confirm-accept"></button></div>
     </form>
   </dialog>
+  <aside class="queue-dock hidden" id="queue-dock" aria-label="Queue">
+    <div class="queue-dock-header">
+      <span class="queue-dock-grip" id="queue-dock-grip" data-i18n-title="dragQueue"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span>
+      <button type="button" class="queue-dock-toggle" id="queue-dock-toggle" aria-expanded="false"><span class="queue-dock-icon">≡</span><span data-i18n="queue">Queue</span><span class="queue-dock-count" id="queue-dock-count"></span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+      <button type="button" class="queue-dock-play" id="queue-dock-play" data-i18n-title="playQueueButton">▶</button>
+    </div>
+    <div class="queue-dock-list" id="queue-dock-list"></div>
+  </aside>
   <dialog class="modal player-modal" id="player-dialog">
     <form method="dialog" class="modal-close-form player-close"><button class="icon-button" aria-label="Close" data-i18n-title="close"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></form>
-    <div class="player-frame" id="player-frame"></div><div class="player-info"><div><p class="eyebrow" id="player-channel"></p><h2 id="player-title"></h2></div><a class="button button-secondary" id="youtube-link" target="_blank" rel="noopener noreferrer" data-i18n="openOnYoutube">Open on YouTube ↗</a></div>
+    <div class="player-main">
+      <div class="player-frame" id="player-frame"></div>
+      <div class="player-info"><div><p class="eyebrow" id="player-channel"></p><h2 id="player-title"></h2></div><a class="button button-secondary" id="youtube-link" target="_blank" rel="noopener noreferrer" data-i18n="openOnYoutube">Open on YouTube ↗</a></div>
+    </div>
+    <aside class="player-queue hidden" id="player-queue">
+      <div class="player-queue-header">
+        <div><p class="player-queue-title" data-i18n="queue">Queue</p><p class="player-queue-position" id="player-queue-position"></p></div>
+        <button type="button" class="player-queue-step" id="player-previous" data-i18n-title="previous"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M7 5.5a1 1 0 0 0-2 0v13a1 1 0 0 0 2 0zM19 6.2v11.6a1 1 0 0 1-1.5.86L9.2 13.1a1.3 1.3 0 0 1 0-2.2l8.3-5.56a1 1 0 0 1 1.5.86z"/></svg></button>
+        <button type="button" class="player-queue-step" id="player-next" data-i18n-title="next"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M17 5.5a1 1 0 0 1 2 0v13a1 1 0 0 1-2 0zM5 6.2v11.6a1 1 0 0 0 1.5.86l8.3-5.56a1.3 1.3 0 0 0 0-2.2L6.5 5.34A1 1 0 0 0 5 6.2z"/></svg></button>
+      </div>
+      <div class="player-queue-body"><div class="player-queue-list" id="player-queue-list"></div></div>
+    </aside>
   </dialog>
   <script async src="https://www.youtube.com/iframe_api"></script>
   <script defer src="/vendor/air-datepicker/air-datepicker.js"></script>

@@ -105,24 +105,29 @@ export function createYouTubeClient({ settings, fetch = globalThis.fetch }) {
       return channel;
     },
 
-    async listRecentUploads(uploadsPlaylistId) {
-      const data = await request('playlistItems', { part: 'snippet,contentDetails', playlistId: uploadsPlaylistId, maxResults: '50' });
-      return (data.items || [])
-        .filter((item) => !unavailableTitles.has(item.snippet?.title))
-        .map(toVideo)
-        .filter((video) => video.videoId);
-    },
-
-    async listRecentShortIds(channelId) {
+    async listRecentUploads(playlistId, { limit = 50, missingIsEmpty = false } = {}) {
+      const items = [];
+      let pageToken = '';
       try {
-        const data = await request('playlistItems', { part: 'contentDetails', playlistId: `UUSH${channelId.slice(2)}`, maxResults: '50' });
-        return (data.items || []).map((item) => item.contentDetails?.videoId).filter(Boolean);
+        do {
+          const params = { part: 'snippet,contentDetails', playlistId, maxResults: String(Math.min(50, limit - items.length)) };
+          if (pageToken) {
+            params.pageToken = pageToken;
+          }
+          const data = await request('playlistItems', params);
+          items.push(...(data.items || []));
+          pageToken = data.nextPageToken || '';
+        } while (pageToken && items.length < limit);
       } catch (error) {
-        if (error.status === 404) {
+        if (missingIsEmpty && error.status === 404) {
           return [];
         }
         throw error;
       }
+      return items
+        .filter((item) => !unavailableTitles.has(item.snippet?.title))
+        .map(toVideo)
+        .filter((video) => video.videoId);
     }
   };
 }

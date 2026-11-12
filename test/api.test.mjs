@@ -229,8 +229,14 @@ test('with history turned off, playback is not recorded but marking as watched s
 });
 
 test('shorts are left out of the feed by default and come back when the setting is off', async (t) => {
-  const youtube = youtubeWithChannels();
-  youtube.listRecentShortIds = async (channelId) => (channelId === alphaId ? ['a2'] : []);
+  const youtube = createFakeYouTube({
+    channels: [channel(alphaId, { title: 'Alpha', handle: '@alpha' }), channel(betaId, { title: 'Beta', handle: '@beta' })],
+    uploads: {
+      [`UU${alphaId}`]: [video('a1', '2026-11-08T10:00:00Z'), video('a2', '2026-11-10T10:00:00Z')],
+      [`UU${betaId}`]: [video('b1', '2026-11-09T10:00:00Z')]
+    },
+    shorts: { [alphaId]: ['a2'] }
+  });
   const app = await startTestApp({ youtube });
   t.after(app.close);
   await addBoth(app);
@@ -240,6 +246,24 @@ test('shorts are left out of the feed by default and come back when the setting 
   await app.request('POST', '/api/settings', { body: { hideShorts: false } });
   await app.request('POST', '/api/sync');
   assert.deepEqual((await app.request('GET', '/api/videos')).data.videos.map((row) => row.video_id), ['a2', 'b1', 'a1']);
+});
+
+test('videos per channel accepts only the offered values', async (t) => {
+  const app = await startTestApp();
+  t.after(app.close);
+  assert.equal((await app.request('GET', '/api/settings')).data.videosPerChannel, 50);
+  assert.equal((await app.request('POST', '/api/settings', { body: { videosPerChannel: 75 } })).data.videosPerChannel, 50);
+  assert.equal((await app.request('POST', '/api/settings', { body: { videosPerChannel: 200 } })).data.videosPerChannel, 200);
+});
+
+test('data saver is off by default and saved as a boolean', async (t) => {
+  const app = await startTestApp();
+  t.after(app.close);
+  assert.equal((await app.request('GET', '/api/settings')).data.dataSaver, false);
+  assert.equal((await app.request('POST', '/api/settings', { body: { dataSaver: 'yes' } })).data.dataSaver, false);
+  assert.equal((await app.request('POST', '/api/settings', { body: { dataSaver: true } })).data.dataSaver, true);
+  assert.equal((await app.request('GET', '/api/settings')).data.floatingQueue, true);
+  assert.equal((await app.request('POST', '/api/settings', { body: { floatingQueue: false } })).data.floatingQueue, false);
 });
 
 test('sync interval accepts only the offered values', async (t) => {
@@ -284,4 +308,35 @@ test('malformed URLs and path traversal are rejected without crashing', async (t
   assert.equal((await app.request('GET', '/%E0%A4%A')).status, 400);
   assert.equal((await app.request('GET', '/..%2Fpackage.json')).status, 403);
   assert.equal((await app.request('GET', '/api/health')).status, 200);
+});
+
+test('the play queue keeps order, ignores duplicates, reorders and survives a cache clear', async (t) => {
+  const app = await startTestApp({ youtube: youtubeWithChannels() });
+  t.after(app.close);
+  await addBoth(app);
+  const ids = (response) => response.data.queue.map((row) => row.video_id);
+
+  await app.request('POST', '/api/queue', { body: { videoId: 'a1' } });
+  await app.request('POST', '/api/queue', { body: { videoId: 'b1' } });
+  assert.deepEqual(ids(await app.request('POST', '/api/queue', { body: { videoId: 'a1' } })), ['a1', 'b1']);
+  assert.equal((await app.request('POST', '/api/queue', { body: { videoId: 'missing' } })).status, 404);
+
+  assert.deepEqual(ids(await app.request('PUT', '/api/queue', { body: { videoIds: ['b1', 'a1'] } })), ['b1', 'a1']);
+  assert.equal((await app.request('PUT', '/api/queue', { body: { videoIds: ['b1'] } })).status, 400);
+  assert.equal((await app.request('PUT', '/api/queue', { body: { videoIds: ['b1', 'b1'] } })).status, 400);
+
+  await app.request('POST', '/api/cache/clear');
+  assert.deepEqual(ids(await app.request('GET', '/api/queue')), ['b1', 'a1']);
+
+  assert.deepEqual(ids(await app.request('DELETE', '/api/queue', { body: { videoId: 'b1' } })), ['a1']);
+  await app.request('POST', '/api/queue', { body: { videoId: 'a2' } });
+  assert.deepEqual(ids(await app.request('GET', '/api/queue')), ['a1', 'a2']);
+  assert.deepEqual(ids(await app.request('DELETE', '/api/queue', { body: { all: true } })), []);
+});
+
+test('the live reload endpoint only exists in dev mode', async (t) => {
+  const app = await startTestApp();
+  t.after(app.close);
+  assert.equal((await app.request('GET', '/api/settings')).data.dev, false);
+  assert.equal((await app.request('GET', '/api/dev/reload')).status, 404);
 });

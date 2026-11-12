@@ -15,6 +15,9 @@ export function createSettingsStore(db, credentialDefaults) {
     showLastSync: () => get('show_last_sync', 'true') === 'true',
     recordHistory: () => get('record_history', 'true') === 'true',
     hideShorts: () => get('hide_shorts', 'true') === 'true',
+    videosPerChannel: () => Number(get('videos_per_channel', '50')),
+    floatingQueue: () => get('floating_queue', 'true') === 'true',
+    dataSaver: () => get('data_saver', 'false') === 'true',
     markWatchedOnClose: () => get('mark_watched_on_close', 'true') === 'true',
     syncIntervalMinutes: () => Number(get('sync_interval_minutes', '30'))
   };

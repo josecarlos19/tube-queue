@@ -8,6 +8,7 @@ export async function api(url, options = {}) {
 }
 
 export const postJson = (url, body = {}) => api(url, { method: 'POST', body: JSON.stringify(body) });
+export const putJson = (url, body = {}) => api(url, { method: 'PUT', body: JSON.stringify(body) });
 export const deleteJson = (url, body) => api(url, { method: 'DELETE', body: body === undefined ? undefined : JSON.stringify(body) });
 
 export function localDayRange([fromDate, toDate] = []) {

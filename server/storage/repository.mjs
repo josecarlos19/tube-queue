@@ -18,8 +18,6 @@ export function createRepository(db) {
       channel_id=excluded.channel_id, title=excluded.title, description=excluded.description,
       thumbnail_url=excluded.thumbnail_url, published_at=excluded.published_at, cached_at=excluded.cached_at
   `);
-  const deleteUnwatchedVideo = db.prepare(`DELETE FROM videos WHERE video_id = ? AND channel_id = ?
-    AND video_id NOT IN (SELECT video_id FROM watch_history)`);
   const markSynced = db.prepare('UPDATE channels SET last_synced_at = ?, sync_error = NULL WHERE channel_id = ?');
   const deleteHistoryEntry = db.prepare('DELETE FROM watch_history WHERE video_id = ?');
 
@@ -47,13 +45,10 @@ export function createRepository(db) {
       const statement = db.prepare('DELETE FROM channels WHERE channel_id = ?');
       return transaction(() => channelIds.reduce((deleted, channelId) => deleted + Number(statement.run(channelId).changes), 0));
     },
-    saveUploads(channelId, videos, syncedAt, discardedVideoIds = []) {
+    saveUploads(channelId, videos, syncedAt) {
       transaction(() => {
         for (const video of videos) {
           upsertVideo.run(video.videoId, channelId, video.title, video.description, video.thumbnailUrl, video.publishedAt, syncedAt);
-        }
-        for (const videoId of discardedVideoIds) {
-          deleteUnwatchedVideo.run(videoId, channelId);
         }
         markSynced.run(syncedAt, channelId);
       });
@@ -64,7 +59,8 @@ export function createRepository(db) {
 
     clearVideoCache() {
       return transaction(() => {
-        const removed = Number(db.prepare('DELETE FROM videos WHERE video_id NOT IN (SELECT video_id FROM watch_history)').run().changes);
+        const removed = Number(db.prepare(`DELETE FROM videos WHERE video_id NOT IN (SELECT video_id FROM watch_history)
+          AND video_id NOT IN (SELECT video_id FROM play_queue)`).run().changes);
         db.prepare('UPDATE channels SET last_synced_at = NULL').run();
         return removed;
       });
@@ -85,7 +81,7 @@ export function createRepository(db) {
         FROM videos
         JOIN channels ON channels.channel_id = videos.channel_id
         LEFT JOIN watch_history ON watch_history.video_id = videos.video_id
-        ${where} ORDER BY videos.published_at DESC LIMIT 300`).all(...values);
+        ${where} ORDER BY videos.published_at DESC LIMIT 2000`).all(...values);
     },
     videoExists(videoId) {
       return Boolean(db.prepare('SELECT 1 FROM videos WHERE video_id = ?').get(videoId));
@@ -124,6 +120,35 @@ export function createRepository(db) {
       db.prepare(`UPDATE watch_history SET last_activity_at = ?, manually_watched = 0,
         playback_state = CASE WHEN playback_state = 'finished' THEN 'started' ELSE playback_state END
         WHERE video_id = ?`).run(at, videoId);
+    },
+    listQueue() {
+      return db.prepare(`SELECT videos.*, channels.title AS channel_title, channels.thumbnail_url AS channel_thumbnail,
+          watch_history.playback_state, watch_history.manually_watched, play_queue.added_at AS queued_at
+        FROM play_queue
+        JOIN videos ON videos.video_id = play_queue.video_id
+        JOIN channels ON channels.channel_id = videos.channel_id
+        LEFT JOIN watch_history ON watch_history.video_id = play_queue.video_id
+        ORDER BY play_queue.position`).all();
+    },
+    enqueue(videoId, at) {
+      db.prepare(`INSERT INTO play_queue(video_id, position, added_at)
+        VALUES (?, (SELECT COALESCE(MAX(position), 0) + 1 FROM play_queue), ?)
+        ON CONFLICT(video_id) DO NOTHING`).run(videoId, at);
+    },
+    dequeue(videoId) {
+      db.prepare('DELETE FROM play_queue WHERE video_id = ?').run(videoId);
+    },
+    clearQueue() {
+      db.prepare('DELETE FROM play_queue').run();
+    },
+    reorderQueue(videoIds) {
+      const current = db.prepare('SELECT video_id FROM play_queue').all().map((row) => row.video_id);
+      if (videoIds.length !== current.length || new Set(videoIds).size !== current.length || !videoIds.every((videoId) => current.includes(videoId))) {
+        return false;
+      }
+      const update = db.prepare('UPDATE play_queue SET position = ? WHERE video_id = ?');
+      transaction(() => videoIds.forEach((videoId, index) => update.run(index + 1, videoId)));
+      return true;
     },
     deleteHistory(videoIds) {
       transaction(() => {

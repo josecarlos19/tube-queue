@@ -28,16 +28,21 @@ export function createFakeYouTube({ channels = [], uploads = {}, shorts = {}, fa
       }
       return found;
     },
-    async listRecentUploads(playlistId) {
-      calls.push(['listRecentUploads', playlistId]);
-      if (failingPlaylists.has(playlistId)) {
-        throw new Error(`Playlist ${playlistId} failed`);
+    async listRecentUploads(playlistId, options = {}) {
+      calls.push(['listRecentUploads', playlistId, options]);
+      const uploadsPlaylistId = `UU${playlistId.replace(/^UU(LF|LV)?/, '')}`;
+      if (failingPlaylists.has(uploadsPlaylistId)) {
+        throw new Error(`Playlist ${uploadsPlaylistId} failed`);
       }
-      return uploads[playlistId] || [];
-    },
-    async listRecentShortIds(channelId) {
-      calls.push(['listRecentShortIds', channelId]);
-      return shorts[channelId] || [];
+      const channelShorts = new Set(shorts[uploadsPlaylistId.slice(2)] || []);
+      const all = uploads[uploadsPlaylistId] || [];
+      if (playlistId.startsWith('UULF')) {
+        return all.filter((item) => !channelShorts.has(item.videoId) && !item.live);
+      }
+      if (playlistId.startsWith('UULV')) {
+        return all.filter((item) => item.live);
+      }
+      return all;
     }
   };
 }

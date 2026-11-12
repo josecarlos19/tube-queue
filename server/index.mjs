@@ -8,7 +8,7 @@ import { createApp } from './http/app.mjs';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 loadEnvFile(rootDir);
-const config = readConfig(process.env, rootDir);
+const config = { ...readConfig(process.env, rootDir), dev: process.argv.includes('--dev') };
 
 process.umask(0o077);
 const db = openDatabase(config.dataDir);

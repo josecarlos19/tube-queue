@@ -1,4 +1,4 @@
-export function createSyncService({ repository, youtube, intervalMs, concurrency, hideShorts = () => false, now = () => new Date() }) {
+export function createSyncService({ repository, youtube, intervalMs, concurrency, hideShorts = () => false, videosPerChannel = () => 50, now = () => new Date() }) {
   let running = null;
 
   async function syncChannel(channelId) {
@@ -7,13 +7,15 @@ export function createSyncService({ repository, youtube, intervalMs, concurrency
       return;
     }
     try {
-      const [uploads, shortIds] = await Promise.all([
-        youtube.listRecentUploads(channel.uploads_playlist_id),
-        hideShorts() ? youtube.listRecentShortIds(channelId) : []
-      ]);
-      const shorts = new Set(shortIds);
-      const videos = uploads.filter((video) => !shorts.has(video.videoId));
-      repository.saveUploads(channelId, videos, now().toISOString(), shortIds);
+      const limit = videosPerChannel();
+      const playlistSuffix = channel.uploads_playlist_id.slice(2);
+      const videos = hideShorts()
+        ? (await Promise.all([
+            youtube.listRecentUploads(`UULF${playlistSuffix}`, { limit, missingIsEmpty: true }),
+            youtube.listRecentUploads(`UULV${playlistSuffix}`, { limit: 50, missingIsEmpty: true })
+          ])).flat().sort((first, second) => String(second.publishedAt).localeCompare(String(first.publishedAt))).slice(0, limit)
+        : await youtube.listRecentUploads(channel.uploads_playlist_id, { limit });
+      repository.saveUploads(channelId, videos, now().toISOString());
     } catch (error) {
       repository.recordSyncError(channelId, error.message);
       throw error;

@@ -51,24 +51,31 @@ test('concurrent callers share one run', async () => {
   assert.equal(youtube.calls.filter(([name]) => name === 'listRecentUploads').length, 3);
 });
 
-test('with shorts hidden, they are never saved and cached unwatched ones are removed', async () => {
+test('with shorts hidden it reads the long-form and live playlists, otherwise all uploads', async () => {
   const youtube = createFakeYouTube({
-    uploads: { UUa: [video('long', '2026-11-09T00:00:00Z'), video('short', '2026-11-10T00:00:00Z'), video('watched-short', '2026-11-08T00:00:00Z')] },
-    shorts: { a: ['short', 'watched-short'] }
+    uploads: { UUa: [video('long', '2026-11-09T00:00:00Z'), video('short', '2026-11-10T00:00:00Z'), video('live', '2026-11-08T00:00:00Z', { live: true })] },
+    shorts: { a: ['short'] }
   });
   const repository = createRepository(openMemoryDatabase());
-  const settings = { hideShorts: false };
-  const sync = createSyncService({ repository, youtube, intervalMs: () => 0, concurrency: 1, hideShorts: () => settings.hideShorts });
+  const settings = { hideShorts: true, videosPerChannel: 200 };
+  const sync = createSyncService({ repository, youtube, intervalMs: () => 0, concurrency: 1, hideShorts: () => settings.hideShorts, videosPerChannel: () => settings.videosPerChannel });
   repository.upsertChannel(channel('a'), '2026-11-01T00:00:00Z');
 
   await sync.syncStale(true);
-  assert.equal(youtube.calls.some(([name]) => name === 'listRecentShortIds'), false);
-  assert.deepEqual(repository.searchVideos({}).map((row) => row.video_id), ['short', 'long', 'watched-short']);
-  repository.markWatched('watched-short', '2026-11-10T00:00:00Z');
+  assert.deepEqual(youtube.calls.map(([, playlistId, options]) => [playlistId, options.limit]), [['UULFa', 200], ['UULVa', 50]]);
+  assert.deepEqual(repository.searchVideos({}).map((row) => row.video_id), ['long', 'live']);
 
-  settings.hideShorts = true;
+  const limited = createRepository(openMemoryDatabase());
+  limited.upsertChannel(channel('a'), '2026-11-01T00:00:00Z');
+  await createSyncService({ repository: limited, youtube, intervalMs: () => 0, concurrency: 1, hideShorts: () => true, videosPerChannel: () => 1 }).syncStale(true);
+  assert.deepEqual(limited.searchVideos({}).map((row) => row.video_id), ['long']);
+
+  settings.hideShorts = false;
+  settings.videosPerChannel = 100;
+  youtube.calls.length = 0;
   await sync.syncStale(true);
-  assert.deepEqual(repository.searchVideos({}).map((row) => row.video_id), ['long', 'watched-short']);
+  assert.deepEqual(youtube.calls.map(([, playlistId, options]) => [playlistId, options.limit]), [['UUa', 100]]);
+  assert.deepEqual(repository.searchVideos({}).map((row) => row.video_id), ['short', 'long', 'live']);
 });
 
 test('an interval of zero turns off automatic syncs but manual ones still run', async () => {

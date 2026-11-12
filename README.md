@@ -65,6 +65,7 @@ The free [daily quota](https://developers.google.com/youtube/v3/getting-started#
 - **No login.** TubeQueue listens on `127.0.0.1` only. To reach it from other devices, put it behind a reverse proxy with authentication.
 - **Backups.** All your data lives in `data/`. Stop the app and copy that folder.
 - **Updates.** Run `git pull`, then restart the app (or rebuild the container).
+- **Development.** `npm run dev` restarts the server and reloads the page when you edit a file.
 
 TubeQueue is not affiliated with YouTube or Google.
 

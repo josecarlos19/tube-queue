@@ -65,6 +65,7 @@ A [cota diária gratuita](https://developers.google.com/youtube/v3/getting-start
 - **Sem login.** O TubeQueue escuta apenas em `127.0.0.1`. Para acessar de outros dispositivos, use um proxy reverso com autenticação.
 - **Backup.** Todos os seus dados ficam em `data/`. Pare o app e copie essa pasta.
 - **Atualização.** Rode `git pull` e reinicie o app (ou reconstrua o container).
+- **Desenvolvimento.** `npm run dev` reinicia o servidor e recarrega a página quando você edita um arquivo.
 
 O TubeQueue não tem vínculo com o YouTube nem com o Google.
 
