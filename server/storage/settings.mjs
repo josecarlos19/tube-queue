@@ -19,6 +19,7 @@ export function createSettingsStore(db, credentialDefaults) {
     floatingQueue: () => get('floating_queue', 'true') === 'true',
     dataSaver: () => get('data_saver', 'false') === 'true',
     markWatchedOnClose: () => get('mark_watched_on_close', 'true') === 'true',
+    autoplayNext: () => get('autoplay_next', 'true') === 'true',
     syncIntervalMinutes: () => Number(get('sync_interval_minutes', '30'))
   };
 }

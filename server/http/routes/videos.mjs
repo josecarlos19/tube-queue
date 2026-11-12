@@ -8,6 +8,7 @@ export function videoRoutes({ repository, sync, logger }) {
         sync.syncStale(false).catch((error) => logger.error('Background sync failed:', error.message));
         const videos = repository.searchVideos({
           channelId: url.searchParams.get('channel') || '',
+          groupId: Number(url.searchParams.get('group')) || 0,
           query: url.searchParams.get('q')?.trim() || ''
         });
         json(res, 200, { videos });

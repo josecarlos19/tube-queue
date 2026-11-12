@@ -340,3 +340,38 @@ test('the live reload endpoint only exists in dev mode', async (t) => {
   assert.equal((await app.request('GET', '/api/settings')).data.dev, false);
   assert.equal((await app.request('GET', '/api/dev/reload')).status, 404);
 });
+
+test('channel groups filter the feed and follow their channels', async (t) => {
+  const app = await startTestApp({ youtube: youtubeWithChannels() });
+  t.after(app.close);
+  await addBoth(app);
+  const channelIds = (await app.request('GET', '/api/channels')).data.channels.map((row) => row.channel_id);
+  const [first, second] = channelIds;
+
+  assert.equal((await app.request('POST', '/api/groups', { body: { name: '  ' } })).status, 400);
+  const created = await app.request('POST', '/api/groups', { body: { name: 'Tech', channelIds: [first, 'unknown'] } });
+  assert.equal(created.status, 201);
+  assert.deepEqual(created.data.groups.map((group) => [group.name, group.channel_ids]), [['Tech', [first]]]);
+  assert.equal((await app.request('POST', '/api/groups', { body: { name: 'tech' } })).status, 409);
+
+  const groupId = created.data.groups[0].group_id;
+  const grouped = (await app.request('GET', `/api/videos?group=${groupId}`)).data.videos;
+  assert.ok(grouped.length > 0 && grouped.every((row) => row.channel_id === first));
+
+  const renamed = await app.request('PUT', `/api/groups/${groupId}`, { body: { name: 'News', channelIds: [second] } });
+  assert.deepEqual(renamed.data.groups.map((group) => [group.name, group.channel_ids]), [['News', [second]]]);
+  assert.equal((await app.request('PUT', '/api/groups/999', { body: { name: 'x' } })).status, 404);
+
+  await app.request('DELETE', `/api/channels/${second}`);
+  assert.deepEqual((await app.request('GET', '/api/groups')).data.groups[0].channel_ids, []);
+  assert.equal((await app.request('DELETE', `/api/groups/${groupId}`)).data.groups.length, 0);
+  assert.equal((await app.request('DELETE', `/api/groups/${groupId}`)).status, 404);
+});
+
+test('autoplay of the next video is on by default and can be turned off', async (t) => {
+  const app = await startTestApp();
+  t.after(app.close);
+  assert.equal((await app.request('GET', '/api/settings')).data.autoplayNext, true);
+  assert.equal((await app.request('POST', '/api/settings', { body: { autoplayNext: false } })).data.autoplayNext, false);
+  assert.equal((await app.request('POST', '/api/settings', { body: { autoplayNext: 'no' } })).data.autoplayNext, false);
+});

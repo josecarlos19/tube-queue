@@ -65,11 +65,55 @@ export function createRepository(db) {
         return removed;
       });
     },
-    searchVideos({ channelId, query }) {
+    listGroups() {
+      const members = db.prepare('SELECT group_id, channel_id FROM channel_group_members').all();
+      return db.prepare('SELECT group_id, name FROM channel_groups ORDER BY name COLLATE NOCASE').all().map((group) => ({
+        ...group,
+        channel_ids: members.filter((member) => member.group_id === group.group_id).map((member) => member.channel_id)
+      }));
+    },
+    findGroup(groupId) {
+      return this.listGroups().find((group) => group.group_id === groupId);
+    },
+    groupNameTaken(name, exceptGroupId = null) {
+      return Boolean(db.prepare('SELECT 1 FROM channel_groups WHERE name = ? AND group_id IS NOT ?').get(name, exceptGroupId));
+    },
+    createGroup(name, channelIds, at) {
+      return transaction(() => {
+        const groupId = Number(db.prepare('INSERT INTO channel_groups(name, created_at) VALUES (?, ?)').run(name, at).lastInsertRowid);
+        this.setGroupChannels(groupId, channelIds);
+        return groupId;
+      });
+    },
+    updateGroup(groupId, { name, channelIds }) {
+      transaction(() => {
+        if (name !== undefined) {
+          db.prepare('UPDATE channel_groups SET name = ? WHERE group_id = ?').run(name, groupId);
+        }
+        if (channelIds !== undefined) {
+          this.setGroupChannels(groupId, channelIds);
+        }
+      });
+    },
+    setGroupChannels(groupId, channelIds) {
+      db.prepare('DELETE FROM channel_group_members WHERE group_id = ?').run(groupId);
+      const insert = db.prepare(`INSERT OR IGNORE INTO channel_group_members(group_id, channel_id)
+        SELECT ?, channel_id FROM channels WHERE channel_id = ?`);
+      for (const channelId of channelIds) {
+        insert.run(groupId, channelId);
+      }
+    },
+    deleteGroup(groupId) {
+      return Number(db.prepare('DELETE FROM channel_groups WHERE group_id = ?').run(groupId).changes) > 0;
+    },
+    searchVideos({ channelId, groupId, query }) {
       const conditions = [];
       const values = [];
       if (channelId) {
         conditions.push('videos.channel_id = ?'); values.push(channelId);
+      }
+      if (groupId) {
+        conditions.push('videos.channel_id IN (SELECT channel_id FROM channel_group_members WHERE group_id = ?)'); values.push(groupId);
       }
       if (query) {
         conditions.push('(videos.title LIKE ? OR videos.description LIKE ? OR channels.title LIKE ?)');

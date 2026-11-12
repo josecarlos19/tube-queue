@@ -39,6 +39,17 @@ const schema = `
     position INTEGER NOT NULL,
     added_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS channel_groups (
+    group_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS channel_group_members (
+    group_id INTEGER NOT NULL REFERENCES channel_groups(group_id) ON DELETE CASCADE,
+    channel_id TEXT NOT NULL REFERENCES channels(channel_id) ON DELETE CASCADE,
+    PRIMARY KEY (group_id, channel_id)
+  );
+  CREATE INDEX IF NOT EXISTS group_members_channel_idx ON channel_group_members(channel_id);
   CREATE TABLE IF NOT EXISTS settings (
     setting_key TEXT PRIMARY KEY,
     setting_value TEXT NOT NULL

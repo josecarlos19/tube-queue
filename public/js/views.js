@@ -73,9 +73,9 @@ export function historyRow(video, selected, t, formatDate, options = {}) {
 export function queueRow(video, index, total, t, formatDate, options = {}) {
   const videoId = escapeHtml(video.video_id);
   const moveButton = (direction, label, symbol, disabled) => `<button class="icon-button queue-move" data-queue-move="${direction}" data-video-id="${videoId}" title="${escapeHtml(t(label))}" aria-label="${escapeHtml(t(label))}" ${disabled ? 'disabled' : ''}>${symbol}</button>`;
-  return `<article class="history-row queue-row${isWatched(video) ? ' watched' : ''}">
+  return `<article class="history-row queue-row${isWatched(video) ? ' watched' : ''}" data-queue-item="${videoId}" draggable="true">
     <span class="queue-position">${index + 1}</span>
-    <button class="history-thumb" data-play-queue="${videoId}"><img src="${escapeHtml(thumbnailUrl(video.thumbnail_url, options))}" alt=""><span>▶</span></button>
+    <button class="history-thumb" data-play-queue="${videoId}"><img draggable="false" src="${escapeHtml(thumbnailUrl(video.thumbnail_url, options))}" alt=""><span>▶</span></button>
     <div class="history-copy">
       <button class="video-title" data-play-queue="${videoId}">${escapeHtml(video.title)}</button>
       <p>${escapeHtml(video.channel_title)}</p>
@@ -89,8 +89,8 @@ export function queueRow(video, index, total, t, formatDate, options = {}) {
 export function queueDockItem(video, index, total, t, options = {}) {
   const videoId = escapeHtml(video.video_id);
   const action = (attribute, value, label, symbol, disabled = false) => `<button type="button" class="queue-dock-action" ${attribute}="${value}" data-video-id="${videoId}" title="${escapeHtml(t(label))}" aria-label="${escapeHtml(t(label))}" ${disabled ? 'disabled' : ''}>${symbol}</button>`;
-  return `<div class="queue-dock-item${isWatched(video) ? ' watched' : ''}">
-    <button type="button" class="queue-dock-thumb" data-play-queue="${videoId}"><img src="${escapeHtml(thumbnailUrl(video.thumbnail_url, { ...options, dataSaver: true }))}" alt=""><span>${index + 1}</span></button>
+  return `<div class="queue-dock-item${isWatched(video) ? ' watched' : ''}" data-queue-item="${videoId}" draggable="true">
+    <button type="button" class="queue-dock-thumb" data-play-queue="${videoId}"><img draggable="false" src="${escapeHtml(thumbnailUrl(video.thumbnail_url, { ...options, dataSaver: true }))}" alt=""><span>${index + 1}</span></button>
     <button type="button" class="queue-dock-copy" data-play-queue="${videoId}"><strong>${escapeHtml(video.title)}</strong><small>${escapeHtml(video.channel_title)}</small></button>
     <div class="queue-dock-actions">
       ${action('data-queue-move', '-1', 'moveUp', '↑', index === 0)}${action('data-queue-move', '1', 'moveDown', '↓', index === total - 1)}${action('data-queue-remove', videoId, 'removeFromQueue', '×')}
@@ -101,9 +101,26 @@ export function queueDockItem(video, index, total, t, options = {}) {
 export function playerQueueItem(video, index, current) {
   const videoId = escapeHtml(video.video_id);
   const classes = ['player-queue-item', current ? 'current' : '', isWatched(video) && !current ? 'watched' : ''].filter(Boolean).join(' ');
-  return `<button type="button" class="${classes}" data-play-queue="${videoId}"${current ? ' aria-current="true"' : ''}>
+  return `<button type="button" class="${classes}" data-play-queue="${videoId}" data-queue-item="${videoId}" draggable="true"${current ? ' aria-current="true"' : ''}>
     <span class="player-queue-index">${current ? '▶' : index + 1}</span>
-    <img src="${escapeHtml(thumbnailUrl(video.thumbnail_url, { dataSaver: true }))}" alt="">
+    <img draggable="false" src="${escapeHtml(thumbnailUrl(video.thumbnail_url, { dataSaver: true }))}" alt="">
     <span class="player-queue-copy"><strong>${escapeHtml(video.title)}</strong><small>${escapeHtml(video.channel_title)}</small></span>
   </button>`;
+}
+
+export function sidebarGroup(group, t, active) {
+  const groupId = escapeHtml(group.group_id);
+  const label = t('editGroup');
+  return `<div class="sidebar-group${active ? ' active' : ''}">
+    <span class="sidebar-group-icon">▤</span>
+    <button type="button" class="sidebar-group-name" data-filter-group="${groupId}" title="${escapeHtml(group.name)}">${escapeHtml(group.name)}</button>
+    <small>${group.channel_ids.length}</small>
+    <button type="button" class="edit-group" data-edit-group="${groupId}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">✎</button>
+  </div>`;
+}
+
+export function groupChannelOption(channel, selected) {
+  return `<label class="sidebar-channel${selected ? ' selected' : ''}">
+    <input class="channel-check" type="checkbox" data-group-channel="${escapeHtml(channel.channel_id)}" ${selected ? 'checked' : ''}><img src="${escapeHtml(channel.thumbnail_url || '/logo.svg')}" alt=""><span title="${escapeHtml(channel.title)}">${escapeHtml(channel.title)}</span>
+  </label>`;
 }

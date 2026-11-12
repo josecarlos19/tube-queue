@@ -3,7 +3,7 @@ import { api, deleteJson, localDayRange, postJson, putJson } from './api.js';
 import { createTranslator } from './i18n.js';
 import { createDateRangePicker } from './date-range.js';
 import { createCombobox } from './combobox.js';
-import { historyRow, playerQueueItem, queueDockItem, queueRow, sidebarChannel, videoCard } from './views.js';
+import { groupChannelOption, historyRow, playerQueueItem, queueDockItem, queueRow, sidebarChannel, sidebarGroup, videoCard } from './views.js';
 
 const views = ['feed', 'queue', 'history', 'settings'];
 const feedLayoutStorageKey = 'tubequeue.feedLayout';
@@ -11,6 +11,8 @@ const feedLayouts = ['grid', 'list', 'rows'];
 const preferenceStorageKey = 'tubequeue.preferences';
 const queueDockStorageKey = 'tubequeue.queueDockOpen';
 const queueDockPositionKey = 'tubequeue.queueDockPosition';
+const theaterStorageKey = 'tubequeue.theater';
+const queueLoopStorageKey = 'tubequeue.queueLoop';
 
 function viewFromUrl() {
   const view = new URLSearchParams(location.search).get('view');
@@ -21,7 +23,7 @@ function urlForView(view) {
   return view === 'feed' ? location.pathname : `${location.pathname}?view=${view}`;
 }
 
-const state = { language: 'en', theme: 'light', channels: [], videos: [], history: [], queue: [], playingFromQueue: false, view: viewFromUrl(), player: null, selectedHistory: new Set(), feedLayout: readFeedLayout(), showLastSync: true, recordHistory: true, hideShorts: true, markWatchedOnClose: true, dataSaver: false, floatingQueue: true, queueDockOpen: readQueueDockOpen(), syncIntervalMinutes: 30, videosPerChannel: 50, playingVideoId: null, selectingChannels: false, selectedChannels: new Set(), settings: {} };
+const state = { language: 'en', theme: 'light', channels: [], groups: [], editingGroupId: null, groupDraft: new Set(), playbackContext: [], autoplayNext: true, queueLoop: readQueueLoop(), dragVideoId: null, theaterMode: readTheaterMode(), videos: [], history: [], queue: [], playingFromQueue: false, view: viewFromUrl(), player: null, selectedHistory: new Set(), feedLayout: readFeedLayout(), showLastSync: true, recordHistory: true, hideShorts: true, markWatchedOnClose: true, dataSaver: false, floatingQueue: true, queueDockOpen: readQueueDockOpen(), syncIntervalMinutes: 30, videosPerChannel: 50, playingVideoId: null, selectingChannels: false, selectedChannels: new Set(), settings: {} };
 const t = createTranslator(() => state.language);
 
 let noticeTimer;
@@ -62,7 +64,10 @@ function hasApiKey() {
 }
 
 let historyRangePicker = null;
-const channelFilter = createCombobox($('#channel-filter'), { onChange: () => loadVideos().catch(showError) });
+const channelFilter = createCombobox($('#channel-filter'), { onChange: () => {
+  renderGroups();
+  loadVideos().catch(showError);
+} });
 
 function applyTranslations() {
   historyRangePicker?.setLanguage(state.language);
@@ -88,6 +93,7 @@ function applyTranslations() {
   $('#hide-shorts').setAttribute('aria-checked', String(state.hideShorts));
   $('#mark-watched-on-close').setAttribute('aria-checked', String(state.markWatchedOnClose));
   $('#data-saver').setAttribute('aria-checked', String(state.dataSaver));
+  $('#autoplay-next').setAttribute('aria-checked', String(state.autoplayNext));
   $('#floating-queue').setAttribute('aria-checked', String(state.floatingQueue));
   renderQueueDock();
   document.querySelectorAll('[data-sync-interval]').forEach((button) => {
@@ -102,6 +108,7 @@ function applyTranslations() {
   document.querySelector('meta[name="theme-color"]').content = state.theme === 'dark' ? '#0f0f0f' : '#f9f9f9';
   $('#theme-toggle').title = t(state.theme === 'dark' ? 'switchToLight' : 'switchToDark');
   renderChannels();
+  renderTheater();
   renderCurrentView();
 }
 
@@ -130,13 +137,103 @@ function renderChannels() {
   renderLastSync();
 
   channelFilter.setOptions(
-    [{ value: '', label: t('allChannels') }, ...state.channels.map((channel) => ({ value: channel.channel_id, label: channel.title, image: channel.thumbnail_url || '/logo.svg' }))],
+    [{ value: '', label: t('allChannels') }, ...state.groups.map((group) => ({ value: `group:${group.group_id}`, label: `${t('groupFilterLabel')}: ${group.name}`, icon: '▤' })), ...state.channels.map((channel) => ({ value: channel.channel_id, label: channel.title, image: channel.thumbnail_url || '/logo.svg' }))],
     { label: t('filterByChannel'), search: t('searchChannels'), empty: t('noChannelMatches') }
   );
+
+  renderGroups();
 
   $('#api-status').textContent = t(hasApiKey() ? 'apiReady' : 'apiMissing');
   $('#api-status-dot').classList.toggle('ready', hasApiKey());
   renderSettings();
+}
+
+function renderGroups() {
+  const list = $('#sidebar-groups');
+  list.innerHTML = state.groups.length
+    ? state.groups.map((group) => sidebarGroup(group, t, channelFilter.value === `group:${group.group_id}`)).join('')
+    : `<p class="sidebar-empty">${t('noGroups')}</p>`;
+}
+
+function filterByGroup(groupId) {
+  const value = `group:${groupId}`;
+  channelFilter.setValue(channelFilter.value === value ? '' : value);
+  $('#sidebar').classList.remove('open');
+  if (state.view !== 'feed') {
+    setView('feed');
+  }
+}
+
+function openGroupDialog(group = null) {
+  if (!state.channels.length) {
+    setNotice(t('needChannelsForGroup'), 'warning');
+    return;
+  }
+  state.editingGroupId = group ? group.group_id : null;
+  state.groupDraft = new Set(group ? group.channel_ids : []);
+  $('#group-dialog-title').textContent = t(group ? 'editGroup' : 'newGroup');
+  $('#group-name').value = group ? group.name : '';
+  $('#group-error').classList.add('hidden');
+  $('#delete-group').classList.toggle('hidden', !group);
+  $('#group-channel-list').innerHTML = state.channels.map((channel) => groupChannelOption(channel, state.groupDraft.has(channel.channel_id))).join('');
+  $('#sidebar').classList.remove('open');
+  $('#group-dialog').showModal();
+  $('#group-name').focus();
+}
+
+async function submitGroup(event) {
+  event.preventDefault();
+  const name = $('#group-name').value.trim();
+  if (!name) {
+    return;
+  }
+  const body = { name, channelIds: [...state.groupDraft] };
+  const button = $('#submit-group');
+  button.disabled = true;
+  $('#group-error').classList.add('hidden');
+  try {
+    const editing = state.editingGroupId !== null;
+    const result = editing ? await putJson(`/api/groups/${state.editingGroupId}`, body) : await postJson('/api/groups', body);
+    state.groups = result.groups;
+    $('#group-dialog').close();
+    renderChannels();
+    if (channelFilter.value.startsWith('group:')) {
+      loadVideos().catch(showError);
+    }
+    setNotice(t('groupSaved'), 'success');
+  } catch (error) {
+    $('#group-error').textContent = error.message;
+    $('#group-error').classList.remove('hidden');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function removeGroup() {
+  const group = state.groups.find((item) => item.group_id === state.editingGroupId);
+  if (!group) {
+    return;
+  }
+  $('#group-dialog').close();
+  const confirmed = await confirmAction({
+    title: t('deleteGroupConfirmTitle').replace('{title}', group.name),
+    message: t('deleteGroupConfirm'),
+    confirmLabel: t('deleteGroup')
+  });
+  if (!confirmed) {
+    return;
+  }
+  try {
+    const wasFiltered = channelFilter.value === `group:${group.group_id}`;
+    state.groups = (await deleteJson(`/api/groups/${group.group_id}`)).groups;
+    renderChannels();
+    if (wasFiltered) {
+      loadVideos().catch(showError);
+    }
+    setNotice(t('groupDeleted'), 'success');
+  } catch (error) {
+    showError(error);
+  }
 }
 
 function renderChannelSelection() {
@@ -246,6 +343,112 @@ function setQueue(queue) {
     renderVideos();
   }
   renderQueueDock();
+  renderQueueLoop();
+  if ($('#player-dialog').open && state.playingFromQueue) {
+    renderPlayerNext();
+  }
+}
+
+function readQueueLoop() {
+  try {
+    return localStorage.getItem(queueLoopStorageKey) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function renderQueueLoop() {
+  document.querySelectorAll('[data-queue-loop]').forEach((button) => {
+    button.classList.toggle('active', state.queueLoop);
+    button.setAttribute('aria-pressed', String(state.queueLoop));
+  });
+  if (state.playingFromQueue && $('#player-dialog').open) {
+    const index = queueIndex();
+    $('#player-previous').disabled = index === 0 && !state.queueLoop;
+    $('#player-next').disabled = index === state.queue.length - 1 && !state.queueLoop;
+  }
+}
+
+function toggleQueueLoop() {
+  state.queueLoop = !state.queueLoop;
+  try {
+    localStorage.setItem(queueLoopStorageKey, String(state.queueLoop));
+  } catch {}
+  renderQueueLoop();
+}
+
+async function clearQueueNow() {
+  setQueue((await deleteJson('/api/queue', { all: true })).queue);
+}
+
+function clearQueueDropMarks() {
+  document.querySelectorAll('.drop-before, .drop-after, .dragging').forEach((node) => node.classList.remove('drop-before', 'drop-after', 'dragging'));
+}
+
+function dropPosition(event, item) {
+  const box = item.getBoundingClientRect();
+  return event.clientY < box.top + box.height / 2 ? 'before' : 'after';
+}
+
+async function dropQueueItem(event, item) {
+  const draggedId = state.dragVideoId;
+  const targetId = item.dataset.queueItem;
+  const position = dropPosition(event, item);
+  const ids = state.queue.map((video) => video.video_id).filter((videoId) => videoId !== draggedId);
+  const targetIndex = ids.indexOf(targetId);
+  if (!draggedId || targetIndex < 0) {
+    return;
+  }
+  ids.splice(position === 'before' ? targetIndex : targetIndex + 1, 0, draggedId);
+  if (ids.join() === state.queue.map((video) => video.video_id).join()) {
+    return;
+  }
+  const byId = new Map(state.queue.map((video) => [video.video_id, video]));
+  setQueue(ids.map((videoId) => byId.get(videoId)));
+  try {
+    setQueue((await putJson('/api/queue', { videoIds: ids })).queue);
+  } catch (error) {
+    showError(error);
+    loadQueue().catch(() => {});
+  }
+}
+
+function bindQueueDrag() {
+  document.addEventListener('dragstart', (event) => {
+    const item = event.target.closest?.('[data-queue-item]');
+    if (!item) {
+      return;
+    }
+    state.dragVideoId = item.dataset.queueItem;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', state.dragVideoId);
+    requestAnimationFrame(() => item.classList.add('dragging'));
+  });
+  document.addEventListener('dragover', (event) => {
+    const item = event.target.closest?.('[data-queue-item]');
+    if (!state.dragVideoId || !item) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('.drop-before, .drop-after').forEach((node) => node.classList.remove('drop-before', 'drop-after'));
+    if (item.dataset.queueItem !== state.dragVideoId) {
+      item.classList.add(`drop-${dropPosition(event, item)}`);
+    }
+  });
+  document.addEventListener('drop', (event) => {
+    const item = event.target.closest?.('[data-queue-item]');
+    if (state.dragVideoId && item) {
+      event.preventDefault();
+      dropQueueItem(event, item);
+    }
+    clearQueueDropMarks();
+    state.dragVideoId = null;
+  });
+  document.addEventListener('dragend', () => {
+    clearQueueDropMarks();
+    state.dragVideoId = null;
+  });
 }
 
 function readQueueDockOpen() {
@@ -347,7 +550,7 @@ function renderQueue() {
   const empty = !state.queue.length;
   $('#queue-empty').classList.toggle('hidden', !empty);
   $('#play-queue').classList.toggle('hidden', empty);
-  $('#clear-queue').classList.toggle('hidden', empty);
+  $('#queue-tools').classList.toggle('hidden', empty);
   $('#queue-list').innerHTML = state.queue.map((video, index) => queueRow(video, index, state.queue.length, t, formatDate, { dataSaver: state.dataSaver })).join('');
 }
 
@@ -372,13 +575,6 @@ async function moveInQueue(videoId, direction) {
   }
   [videoIds[from], videoIds[to]] = [videoIds[to], videoIds[from]];
   setQueue((await putJson('/api/queue', { videoIds })).queue);
-}
-
-async function clearQueue() {
-  const confirmed = await confirmAction({ title: t('clearQueueConfirmTitle'), message: t('clearQueueConfirm'), confirmLabel: t('clearQueue') });
-  if (confirmed) {
-    setQueue((await deleteJson('/api/queue', { all: true })).queue);
-  }
 }
 
 function localDayKey(value) {
@@ -484,19 +680,23 @@ function connectDevReload() {
 }
 
 async function loadChannels() {
-  state.channels = (await api('/api/channels')).channels;
+  const [channels, groups] = await Promise.all([api('/api/channels'), api('/api/groups')]);
+  state.channels = channels.channels;
+  state.groups = groups.groups;
   renderChannels();
 }
 
 async function loadVideos() {
   const params = new URLSearchParams();
   const query = $('#video-search').value.trim();
-  const channelId = channelFilter.value;
+  const filter = channelFilter.value;
   if (query) {
     params.set('q', query);
   }
-  if (channelId) {
-    params.set('channel', channelId);
+  if (filter.startsWith('group:')) {
+    params.set('group', filter.slice('group:'.length));
+  } else if (filter) {
+    params.set('channel', filter);
   }
   state.videos = (await api(`/api/videos?${params}`)).videos;
   renderVideos();
@@ -618,8 +818,7 @@ function renderPlayerNext() {
   if (index < 0) {
     return;
   }
-  $('#player-previous').disabled = index === 0;
-  $('#player-next').disabled = index === state.queue.length - 1;
+  renderQueueLoop();
   $('#player-queue-position').textContent = t('queuePosition').replace('{current}', index + 1).replace('{total}', state.queue.length);
   $('#player-queue-list').innerHTML = state.queue.map((video, position) => playerQueueItem(video, position, position === index)).join('');
   $('#player-queue-list [aria-current]')?.scrollIntoView({ block: 'nearest' });
@@ -640,7 +839,8 @@ async function stepQueue(step, { finished = false } = {}) {
     await loadQueue().catch(() => {});
     renderPlayerNext();
   }
-  const target = state.queue[queueIndex() + step];
+  const position = queueIndex() + step;
+  const target = state.queue[position] || (state.queueLoop && state.queue.length ? state.queue[step > 0 ? 0 : state.queue.length - 1] : undefined);
   if (!target) {
     if (finished) {
       $('#player-dialog').close();
@@ -651,10 +851,69 @@ async function stepQueue(step, { finished = false } = {}) {
   state.player?.loadVideoById?.(target.video_id);
 }
 
+const isWatchedVideo = (video) => Boolean(video.manually_watched) || video.playback_state === 'finished';
+
+function visiblePlaybackOrder() {
+  const thumbnails = document.querySelectorAll('.view:not(.hidden) .thumbnail-button[data-play], .view:not(.hidden) .history-thumb[data-play]');
+  return [...new Set([...thumbnails].map((thumbnail) => thumbnail.dataset.play))];
+}
+
+function nextInPlaybackContext() {
+  const position = state.playbackContext.indexOf(state.playingVideoId);
+  if (position < 0) {
+    return null;
+  }
+  for (const videoId of state.playbackContext.slice(position + 1)) {
+    const video = findVideo(videoId);
+    if (video && !isWatchedVideo(video)) {
+      return video;
+    }
+  }
+  return null;
+}
+
 async function finishCurrentVideo() {
+  if (!state.autoplayNext) {
+    return;
+  }
   if (state.playingFromQueue) {
     await stepQueue(1, { finished: true });
+    return;
   }
+  const next = nextInPlaybackContext();
+  if (!next) {
+    return;
+  }
+  if (state.markWatchedOnClose) {
+    await postJson('/api/history/mark', { videoId: state.playingVideoId }).catch(() => {});
+  }
+  showPlayerVideo(next);
+  state.player?.loadVideoById?.(next.video_id);
+}
+
+function readTheaterMode() {
+  try {
+    return localStorage.getItem(theaterStorageKey) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function renderTheater() {
+  $('#player-dialog').classList.toggle('theater', state.theaterMode);
+  const button = $('#theater-toggle');
+  const label = t(state.theaterMode ? 'exitTheaterMode' : 'theaterMode');
+  button.setAttribute('aria-pressed', String(state.theaterMode));
+  button.title = label;
+  button.setAttribute('aria-label', label);
+}
+
+function toggleTheaterMode() {
+  state.theaterMode = !state.theaterMode;
+  try {
+    localStorage.setItem(theaterStorageKey, String(state.theaterMode));
+  } catch {}
+  renderTheater();
 }
 
 function firstUnwatchedInQueue() {
@@ -673,6 +932,8 @@ function openPlayer(videoId, { fromQueue = false } = {}) {
     return;
   }
   state.playingFromQueue = fromQueue;
+  state.playbackContext = fromQueue ? [] : visiblePlaybackOrder();
+  renderTheater();
   showPlayerVideo(video);
   $('#player-frame').innerHTML = '<div id="youtube-player"></div>';
   $('#player-dialog').showModal();
@@ -693,7 +954,7 @@ function readCachedPreferences() {
 
 function cachePreferences() {
   try {
-    localStorage.setItem(preferenceStorageKey, JSON.stringify({ language: state.language, theme: state.theme, showLastSync: state.showLastSync, recordHistory: state.recordHistory, hideShorts: state.hideShorts, markWatchedOnClose: state.markWatchedOnClose, dataSaver: state.dataSaver, floatingQueue: state.floatingQueue, syncIntervalMinutes: state.syncIntervalMinutes, videosPerChannel: state.videosPerChannel }));
+    localStorage.setItem(preferenceStorageKey, JSON.stringify({ language: state.language, theme: state.theme, showLastSync: state.showLastSync, recordHistory: state.recordHistory, hideShorts: state.hideShorts, markWatchedOnClose: state.markWatchedOnClose, dataSaver: state.dataSaver, autoplayNext: state.autoplayNext, floatingQueue: state.floatingQueue, syncIntervalMinutes: state.syncIntervalMinutes, videosPerChannel: state.videosPerChannel }));
   } catch {}
 }
 
@@ -915,6 +1176,16 @@ function bindEvents() {
     applyTranslations();
     await savePreference('dataSaver', state.dataSaver);
   });
+  $('#autoplay-next').addEventListener('click', async () => {
+    state.autoplayNext = !state.autoplayNext;
+    $('#autoplay-next').setAttribute('aria-checked', String(state.autoplayNext));
+    await savePreference('autoplayNext', state.autoplayNext);
+  });
+  $('#theater-toggle').addEventListener('click', toggleTheaterMode);
+  $('#add-group').addEventListener('click', () => openGroupDialog());
+  $('#group-form').addEventListener('submit', submitGroup);
+  $('#cancel-group').addEventListener('click', () => $('#group-dialog').close());
+  $('#delete-group').addEventListener('click', removeGroup);
   $('#mark-watched-on-close').addEventListener('click', async () => {
     state.markWatchedOnClose = !state.markWatchedOnClose;
     $('#mark-watched-on-close').setAttribute('aria-checked', String(state.markWatchedOnClose));
@@ -943,7 +1214,7 @@ function bindEvents() {
     applyTranslations();
     await savePreference('floatingQueue', state.floatingQueue);
   });
-  $('#clear-queue').addEventListener('click', () => clearQueue().catch(showError));
+  bindQueueDrag();
   $('#player-previous').addEventListener('click', () => stepQueue(-1).catch(showError));
   $('#player-next').addEventListener('click', () => stepQueue(1).catch(showError));
   $('#record-history').addEventListener('click', async () => {
@@ -1007,6 +1278,16 @@ function bindEvents() {
       openPlayer(play.dataset.play);
       return;
     }
+    const filterGroup = event.target.closest('[data-filter-group]');
+    if (filterGroup) {
+      filterByGroup(filterGroup.dataset.filterGroup);
+      return;
+    }
+    const editGroup = event.target.closest('[data-edit-group]');
+    if (editGroup) {
+      openGroupDialog(state.groups.find((group) => String(group.group_id) === editGroup.dataset.editGroup));
+      return;
+    }
     const remove = event.target.closest('[data-remove-channel]');
     if (remove) {
       removeChannel(remove.dataset.removeChannel);
@@ -1036,6 +1317,14 @@ function bindEvents() {
       moveInQueue(queueMove.dataset.videoId, Number(queueMove.dataset.queueMove)).catch(showError);
       return;
     }
+    if (event.target.closest('[data-queue-loop]')) {
+      toggleQueueLoop();
+      return;
+    }
+    if (event.target.closest('[data-clear-queue]')) {
+      clearQueueNow().catch(showError);
+      return;
+    }
     const queueRemove = event.target.closest('[data-queue-remove]');
     if (queueRemove) {
       deleteJson('/api/queue', { videoId: queueRemove.dataset.queueRemove }).then((result) => setQueue(result.queue)).catch(showError);
@@ -1054,6 +1343,16 @@ function bindEvents() {
   });
 
   document.addEventListener('change', (event) => {
+    if (event.target.matches('[data-group-channel]')) {
+      const channelId = event.target.dataset.groupChannel;
+      if (event.target.checked) {
+        state.groupDraft.add(channelId);
+      } else {
+        state.groupDraft.delete(channelId);
+      }
+      event.target.closest('label').classList.toggle('selected', event.target.checked);
+      return;
+    }
     if (event.target.matches('[data-select-channel]')) {
       const channelId = event.target.dataset.selectChannel;
       if (event.target.checked) {
@@ -1111,6 +1410,7 @@ async function start() {
   state.hideShorts = cached.hideShorts !== false;
   state.markWatchedOnClose = cached.markWatchedOnClose !== false;
   state.dataSaver = cached.dataSaver === true;
+  state.autoplayNext = cached.autoplayNext !== false;
   state.floatingQueue = cached.floatingQueue !== false;
   state.syncIntervalMinutes = Number.isInteger(cached.syncIntervalMinutes) ? cached.syncIntervalMinutes : 30;
   state.videosPerChannel = Number.isInteger(cached.videosPerChannel) ? cached.videosPerChannel : 50;
@@ -1128,6 +1428,7 @@ async function start() {
     state.hideShorts = state.settings.hideShorts !== false;
     state.markWatchedOnClose = state.settings.markWatchedOnClose !== false;
     state.dataSaver = state.settings.dataSaver === true;
+    state.autoplayNext = state.settings.autoplayNext !== false;
     state.floatingQueue = state.settings.floatingQueue !== false;
     state.syncIntervalMinutes = state.settings.syncIntervalMinutes ?? 30;
     state.videosPerChannel = state.settings.videosPerChannel ?? 50;

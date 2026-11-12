@@ -2,6 +2,7 @@ import { json } from './respond.mjs';
 import { createStaticHandler } from './static.mjs';
 import { settingsRoutes } from './routes/settings.mjs';
 import { channelRoutes } from './routes/channels.mjs';
+import { groupRoutes } from './routes/groups.mjs';
 import { videoRoutes } from './routes/videos.mjs';
 import { historyRoutes } from './routes/history.mjs';
 import { queueRoutes } from './routes/queue.mjs';
@@ -42,6 +43,7 @@ export function createApp(dependencies) {
     { method: 'GET', path: '/api/health', handler: ({ res }) => json(res, 200, { ok: true }) },
     ...settingsRoutes(dependencies),
     ...channelRoutes(dependencies),
+    ...groupRoutes(dependencies),
     ...videoRoutes(dependencies),
     ...historyRoutes(dependencies),
     ...queueRoutes(dependencies),

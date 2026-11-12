@@ -29,6 +29,9 @@
         <button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span data-i18n="settings">Settings</span></button>
       </nav>
       <div class="sidebar-divider"></div>
+      <div class="section-heading"><span data-i18n="groups">Groups</span><span class="section-actions"><button class="tiny-button" id="add-group" aria-label="New group" data-i18n-title="newGroup">+</button></span></div>
+      <div class="group-list" id="sidebar-groups"></div>
+      <div class="sidebar-divider"></div>
       <div class="section-heading"><span data-i18n="yourChannels">Your channels</span><span class="section-actions"><button class="tiny-button icon-toggle" id="select-channels" data-i18n-title="select" aria-pressed="false"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 12l3 3 5-6"/></svg></button><button class="tiny-button" id="sidebar-add-channel" aria-label="Add channel" data-i18n-title="addChannel">+</button></span></div>
       <div class="channel-bulk hidden" id="channel-bulk">
         <label class="channel-bulk-all"><input class="channel-check" type="checkbox" id="select-all-channels"><span data-i18n="selectAll">Select all</span></label>
@@ -59,7 +62,7 @@
       <section class="view hidden" id="queue-view">
         <div class="page-heading">
           <div><p class="eyebrow" data-i18n="upNext">UP NEXT</p><h1 data-i18n="playQueue">Play queue</h1><p class="subheading" data-i18n="queueDescription">Videos play in this order, one after another.</p></div>
-          <div class="heading-actions"><button class="button button-secondary hidden" id="clear-queue" data-i18n="clearQueue">Clear queue</button><button class="button button-primary hidden" id="play-queue"><span>▶</span><span data-i18n="playQueueButton">Play queue</span></button></div>
+          <div class="heading-actions"><span class="queue-tools hidden" id="queue-tools"><button type="button" class="queue-tool queue-loop" data-queue-loop data-i18n-title="repeatQueue" aria-pressed="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg></button><button type="button" class="queue-tool danger" data-clear-queue data-i18n-title="clearQueue"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></button></span><button class="button button-primary hidden" id="play-queue"><span>▶</span><span data-i18n="playQueueButton">Play queue</span></button></div>
         </div>
         <div class="history-list" id="queue-list"></div>
         <div class="empty-state hidden" id="queue-empty"><div class="empty-art">≡</div><h2 data-i18n="emptyQueueTitle">Your queue is empty</h2><p data-i18n="emptyQueueText">Use the queue button on any video to line it up here.</p></div>
@@ -124,6 +127,10 @@
               <button type="button" class="switch" id="data-saver" role="switch" aria-checked="false" aria-labelledby="data-saver-label"><span></span></button>
             </div>
             <div class="setting-row">
+              <span class="setting-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 5l8 7-8 7z"/><path d="M18 5v14"/></svg></span><div class="setting-row-copy"><p class="setting-row-title" id="autoplay-next-label" data-i18n="autoplayNext">Play next video automatically</p><p class="settings-hint" data-i18n="autoplayNextHint">When a video ends, the next one starts.</p></div>
+              <button type="button" class="switch" id="autoplay-next" role="switch" aria-checked="true" aria-labelledby="autoplay-next-label"><span></span></button>
+            </div>
+            <div class="setting-row">
               <span class="setting-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg></span><div class="setting-row-copy"><p class="setting-row-title" id="mark-watched-on-close-label" data-i18n="markWatchedOnClose">Mark as watched when closing the player</p><p class="settings-hint" data-i18n="markWatchedOnCloseHint">Closing a video marks it as watched.</p></div>
               <button type="button" class="switch" id="mark-watched-on-close" role="switch" aria-checked="true" aria-labelledby="mark-watched-on-close-label"><span></span></button>
             </div>
@@ -175,10 +182,24 @@
       <div class="modal-actions"><button class="button button-secondary" value="cancel" data-i18n="cancel">Cancel</button><button class="button button-danger" value="confirm" id="confirm-accept"></button></div>
     </form>
   </dialog>
+  <dialog class="modal" id="group-dialog">
+    <form method="dialog" class="modal-close-form"><button class="icon-button" aria-label="Close" data-i18n-title="close"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></form>
+    <form id="group-form">
+      <div class="modal-icon">▤</div>
+      <h2 id="group-dialog-title"></h2>
+      <label class="form-label" for="group-name" data-i18n="groupName">Group name</label>
+      <input id="group-name" class="text-input" type="text" autocomplete="off" required maxlength="60" data-i18n-placeholder="groupNamePlaceholder">
+      <p class="form-label" id="group-channels-label" data-i18n="groupChannels">Channels in this group</p>
+      <div class="group-channel-list" id="group-channel-list" aria-labelledby="group-channels-label"></div>
+      <p class="form-error hidden" id="group-error" role="alert"></p>
+      <div class="modal-actions"><button class="button button-danger hidden" type="button" id="delete-group" data-i18n="deleteGroup">Delete group</button><span class="modal-actions-spacer"></span><button class="button button-secondary" type="button" id="cancel-group" data-i18n="cancel">Cancel</button><button class="button button-primary" type="submit" id="submit-group" data-i18n="saveGroup">Save group</button></div>
+    </form>
+  </dialog>
   <aside class="queue-dock hidden" id="queue-dock" aria-label="Queue">
     <div class="queue-dock-header">
       <span class="queue-dock-grip" id="queue-dock-grip" data-i18n-title="dragQueue"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span>
       <button type="button" class="queue-dock-toggle" id="queue-dock-toggle" aria-expanded="false"><span class="queue-dock-icon">≡</span><span data-i18n="queue">Queue</span><span class="queue-dock-count" id="queue-dock-count"></span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+      <button type="button" class="queue-tool queue-loop" data-queue-loop data-i18n-title="repeatQueue" aria-pressed="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg></button><button type="button" class="queue-tool danger" data-clear-queue data-i18n-title="clearQueue"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
       <button type="button" class="queue-dock-play" id="queue-dock-play" data-i18n-title="playQueueButton">▶</button>
     </div>
     <div class="queue-dock-list" id="queue-dock-list"></div>
@@ -187,11 +208,12 @@
     <form method="dialog" class="modal-close-form player-close"><button class="icon-button" aria-label="Close" data-i18n-title="close"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></form>
     <div class="player-main">
       <div class="player-frame" id="player-frame"></div>
-      <div class="player-info"><div><p class="eyebrow" id="player-channel"></p><h2 id="player-title"></h2></div><a class="button button-secondary" id="youtube-link" target="_blank" rel="noopener noreferrer" data-i18n="openOnYoutube">Open on YouTube ↗</a></div>
+      <div class="player-info"><div><p class="eyebrow" id="player-channel"></p><h2 id="player-title"></h2></div><div class="player-info-actions"><button type="button" class="theater-toggle" id="theater-toggle" aria-pressed="false" data-i18n-title="theaterMode"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M9 5v14M15 5v14" opacity="0"/><path d="M7 10V8.5h1.5M17 10V8.5h-1.5M7 14v1.5h1.5M17 14v1.5h-1.5"/></svg></button><a class="button button-secondary" id="youtube-link" target="_blank" rel="noopener noreferrer" data-i18n="openOnYoutube">Open on YouTube ↗</a></div></div>
     </div>
     <aside class="player-queue hidden" id="player-queue">
       <div class="player-queue-header">
         <div><p class="player-queue-title" data-i18n="queue">Queue</p><p class="player-queue-position" id="player-queue-position"></p></div>
+        <button type="button" class="queue-tool queue-loop" data-queue-loop data-i18n-title="repeatQueue" aria-pressed="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg></button><button type="button" class="queue-tool danger" data-clear-queue data-i18n-title="clearQueue"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
         <button type="button" class="player-queue-step" id="player-previous" data-i18n-title="previous"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M7 5.5a1 1 0 0 0-2 0v13a1 1 0 0 0 2 0zM19 6.2v11.6a1 1 0 0 1-1.5.86L9.2 13.1a1.3 1.3 0 0 1 0-2.2l8.3-5.56a1 1 0 0 1 1.5.86z"/></svg></button>
         <button type="button" class="player-queue-step" id="player-next" data-i18n-title="next"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M17 5.5a1 1 0 0 1 2 0v13a1 1 0 0 1-2 0zM5 6.2v11.6a1 1 0 0 0 1.5.86l8.3-5.56a1.3 1.3 0 0 0 0-2.2L6.5 5.34A1 1 0 0 0 5 6.2z"/></svg></button>
       </div>

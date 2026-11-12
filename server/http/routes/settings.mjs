@@ -18,6 +18,7 @@ export function settingsRoutes({ settings, config }) {
     floatingQueue: settings.floatingQueue(),
     dataSaver: settings.dataSaver(),
     markWatchedOnClose: settings.markWatchedOnClose(),
+    autoplayNext: settings.autoplayNext(),
     syncIntervalMinutes: settings.syncIntervalMinutes()
   });
 
@@ -58,6 +59,9 @@ export function settingsRoutes({ settings, config }) {
         }
         if (typeof body.markWatchedOnClose === 'boolean') {
           settings.save('mark_watched_on_close', body.markWatchedOnClose);
+        }
+        if (typeof body.autoplayNext === 'boolean') {
+          settings.save('autoplay_next', body.autoplayNext);
         }
         if (videosPerChannelOptions.includes(body.videosPerChannel)) {
           settings.save('videos_per_channel', body.videosPerChannel);

@@ -33,7 +33,7 @@ export function createCombobox(root, { onChange }) {
   function renderValue() {
     const selected = options.find((option) => option.value === value) || options[0];
     root.querySelector('.combobox-value').innerHTML = selected
-      ? `${selected.image ? `<img src="${escapeHtml(selected.image)}" alt="">` : ''}<span>${escapeHtml(selected.label)}</span>`
+      ? `${selected.image ? `<img src="${escapeHtml(selected.image)}" alt="">` : selected.icon ? `<span class="combobox-option-icon">${selected.icon}</span>` : ''}<span>${escapeHtml(selected.label)}</span>`
       : '';
   }
 
@@ -48,7 +48,7 @@ export function createCombobox(root, { onChange }) {
     }
     list.innerHTML = visible.map((option, index) => `
       <li id="${listId}-${index}" role="option" class="combobox-option${index === activeIndex ? ' active' : ''}" aria-selected="${option.value === value}" data-index="${index}">
-        ${option.image ? `<img src="${escapeHtml(option.image)}" alt="">` : '<span class="combobox-option-icon">≡</span>'}
+        ${option.image ? `<img src="${escapeHtml(option.image)}" alt="">` : `<span class="combobox-option-icon">${option.icon || '≡'}</span>`}
         <span>${escapeHtml(option.label)}</span>
         ${option.value === value ? '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>' : ''}
       </li>`).join('');
@@ -127,6 +127,13 @@ export function createCombobox(root, { onChange }) {
   return {
     get value() {
       return value;
+    },
+    setValue(nextValue) {
+      if (options.some((option) => option.value === nextValue) && nextValue !== value) {
+        value = nextValue;
+        renderValue();
+        onChange(value);
+      }
     },
     setOptions(nextOptions, nextLabels) {
       options = nextOptions;
