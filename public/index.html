@@ -44,11 +44,12 @@
           <div class="heading-actions"><button class="button button-secondary" id="refresh-button"><span>↻</span><span data-i18n="refresh">Refresh</span></button><button class="button button-primary" id="add-channel-button"><span>+</span><span data-i18n="addChannel">Add channel</span></button></div>
         </div>
         <div class="toolbar">
-          <label class="search-box"><span>⌕</span><input id="video-search" type="search" placeholder="Search videos or channels" data-i18n-placeholder="searchPlaceholder"></label>
+          <label class="search-box"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="video-search" type="search" placeholder="Search videos or channels" data-i18n-placeholder="searchPlaceholder"></label>
           <div class="combobox" id="channel-filter"></div>
           <div class="segmented layout-toggle" role="radiogroup" aria-label="Layout" data-i18n-title="layout">
             <button type="button" role="radio" data-layout="grid" data-i18n-title="gridLayout"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg></button>
             <button type="button" role="radio" data-layout="list" data-i18n-title="listLayout"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="7" height="6" rx="1.5"/><rect x="3" y="14" width="7" height="6" rx="1.5"/><path d="M14 6h7M14 9h4M14 16h7M14 19h4"/></svg></button>
+            <button type="button" role="radio" data-layout="rows" data-i18n-title="rowsLayout"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="5" height="6" rx="1.2"/><rect x="10" y="4" width="5" height="6" rx="1.2"/><path d="M17 4h4v6h-4"/><rect x="3" y="14" width="5" height="6" rx="1.2"/><rect x="10" y="14" width="5" height="6" rx="1.2"/><path d="M17 14h4v6h-4"/></svg></button>
           </div>
         </div>
         <div class="video-grid" id="video-grid"></div>
@@ -101,13 +102,37 @@
               <div><p class="setting-row-title" id="record-history-label" data-i18n="recordHistory">Save watch history</p><p class="settings-hint" data-i18n="recordHistoryHint">When off, videos you open are not saved and the History tab is hidden. Existing history is kept, and marking videos as watched still works.</p></div>
               <button type="button" class="switch" id="record-history" role="switch" aria-checked="true" aria-labelledby="record-history-label"><span></span></button>
             </div>
+            <div class="setting-row">
+              <div><p class="setting-row-title" id="hide-shorts-label" data-i18n="hideShorts">Hide Shorts</p><p class="settings-hint" data-i18n="hideShortsHint">Only regular videos appear in the feed. Uses one extra API request per channel on each sync.</p></div>
+              <button type="button" class="switch" id="hide-shorts" role="switch" aria-checked="true" aria-labelledby="hide-shorts-label"><span></span></button>
+            </div>
+            <div class="setting-row">
+              <div><p class="setting-row-title" id="mark-watched-on-close-label" data-i18n="markWatchedOnClose">Mark as watched when closing the player</p><p class="settings-hint" data-i18n="markWatchedOnCloseHint">Closing a video marks it as watched.</p></div>
+              <button type="button" class="switch" id="mark-watched-on-close" role="switch" aria-checked="true" aria-labelledby="mark-watched-on-close-label"><span></span></button>
+            </div>
+          </section>
+          <section class="settings-card">
+            <div class="settings-card-heading"><div class="settings-icon">↻</div><div><h2 data-i18n="syncHeading">Sync</h2></div></div>
+            <p class="form-label" id="sync-interval-label" data-i18n="syncInterval">Automatic sync</p>
+            <div class="segmented" role="radiogroup" aria-labelledby="sync-interval-label">
+              <button type="button" role="radio" data-sync-interval="0" data-i18n="syncOff">Off</button>
+              <button type="button" role="radio" data-sync-interval="15">15 min</button>
+              <button type="button" role="radio" data-sync-interval="30">30 min</button>
+              <button type="button" role="radio" data-sync-interval="60">1 h</button>
+              <button type="button" role="radio" data-sync-interval="180">3 h</button>
+            </div>
+            <p class="settings-hint" data-i18n="syncIntervalHint">The server checks your channels in the background on this schedule, even with the page closed. Each channel costs one API request per sync.</p>
+            <div class="setting-row">
+              <div><p class="setting-row-title" data-i18n="clearCache">Clear video cache</p><p class="settings-hint" data-i18n="clearCacheHint">Removes saved videos and downloads them again. Videos in your history are kept.</p></div>
+              <button type="button" class="button button-secondary" id="clear-cache" data-i18n="clearCacheButton">Clear cache</button>
+            </div>
           </section>
         </div>
       </section>
     </main>
   </div>
   <dialog class="modal" id="channel-dialog">
-    <form method="dialog" class="modal-close-form"><button class="icon-button" aria-label="Close">×</button></form>
+    <form method="dialog" class="modal-close-form"><button class="icon-button" aria-label="Close" data-i18n-title="close"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></form>
     <form id="channel-form">
       <div class="modal-icon">+</div>
       <h2 data-i18n="addChannel">Add channel</h2>
@@ -127,7 +152,7 @@
     </form>
   </dialog>
   <dialog class="modal player-modal" id="player-dialog">
-    <form method="dialog" class="modal-close-form"><button class="icon-button" aria-label="Close">×</button></form>
+    <form method="dialog" class="modal-close-form player-close"><button class="icon-button" aria-label="Close" data-i18n-title="close"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></form>
     <div class="player-frame" id="player-frame"></div><div class="player-info"><div><p class="eyebrow" id="player-channel"></p><h2 id="player-title"></h2></div><a class="button button-secondary" id="youtube-link" target="_blank" rel="noopener noreferrer" data-i18n="openOnYoutube">Open on YouTube ↗</a></div>
   </dialog>
   <script async src="https://www.youtube.com/iframe_api"></script>

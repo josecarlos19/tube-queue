@@ -1,4 +1,4 @@
-export function createSyncService({ repository, youtube, intervalMs, concurrency, now = () => new Date() }) {
+export function createSyncService({ repository, youtube, intervalMs, concurrency, hideShorts = () => false, now = () => new Date() }) {
   let running = null;
 
   async function syncChannel(channelId) {
@@ -7,8 +7,13 @@ export function createSyncService({ repository, youtube, intervalMs, concurrency
       return;
     }
     try {
-      const videos = await youtube.listRecentUploads(channel.uploads_playlist_id);
-      repository.saveUploads(channelId, videos, now().toISOString());
+      const [uploads, shortIds] = await Promise.all([
+        youtube.listRecentUploads(channel.uploads_playlist_id),
+        hideShorts() ? youtube.listRecentShortIds(channelId) : []
+      ]);
+      const shorts = new Set(shortIds);
+      const videos = uploads.filter((video) => !shorts.has(video.videoId));
+      repository.saveUploads(channelId, videos, now().toISOString(), shortIds);
     } catch (error) {
       repository.recordSyncError(channelId, error.message);
       throw error;
@@ -36,7 +41,11 @@ export function createSyncService({ repository, youtube, intervalMs, concurrency
     if (running) {
       return running;
     }
-    const cutoff = now().getTime() - intervalMs;
+    const interval = intervalMs();
+    if (!force && !interval) {
+      return Promise.resolve({ synced: 0, errors: [] });
+    }
+    const cutoff = now().getTime() - interval;
     const due = repository.listChannelsForSync()
       .filter((channel) => force || !channel.last_synced_at || Date.parse(channel.last_synced_at) < cutoff)
       .map((channel) => channel.channel_id);
@@ -46,5 +55,13 @@ export function createSyncService({ repository, youtube, intervalMs, concurrency
     return running;
   }
 
-  return { syncChannel, syncMany, syncStale };
+  function startScheduler({ tickMs = 60_000, onError = () => {} } = {}) {
+    const tick = () => syncStale(false).catch(onError);
+    tick();
+    const timer = setInterval(tick, tickMs);
+    timer.unref?.();
+    return () => clearInterval(timer);
+  }
+
+  return { syncChannel, syncMany, syncStale, startScheduler };
 }

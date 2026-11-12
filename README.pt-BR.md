@@ -20,9 +20,11 @@
 
 ## Recursos
 
-- 📺 **Um feed cronológico** dos canais que você adicionar, em grade ou lista
+- 📺 **Um feed cronológico** dos canais que você adicionar, agrupado por dia, em grade, lista ou fileiras por canal
+- 🚫 **Sem Shorts**, a menos que você queira
+- 🔄 **Sincronização em segundo plano** no intervalo que você escolher
 - ▶️ **Player integrado**, com link para o YouTube para curtir e comentar
-- ✅ **Marcação de vídeos vistos** e **histórico** com filtro por data
+- ✅ **Marcação de vídeos vistos** e **histórico** opcional com filtro por data
 - 🔎 **Busca instantânea** em vídeos e canais
 - 📥 **Importação e exportação** da lista de canais em CSV
 - 🌗 **Temas claro e escuro**, em português e inglês

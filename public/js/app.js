@@ -18,7 +18,7 @@ function urlForView(view) {
   return view === 'feed' ? location.pathname : `${location.pathname}?view=${view}`;
 }
 
-const state = { language: 'en', theme: 'light', channels: [], videos: [], history: [], view: viewFromUrl(), player: null, selectedHistory: new Set(), feedLayout: readFeedLayout(), showLastSync: true, recordHistory: true, selectingChannels: false, selectedChannels: new Set(), settings: {} };
+const state = { language: 'en', theme: 'light', channels: [], videos: [], history: [], view: viewFromUrl(), player: null, selectedHistory: new Set(), feedLayout: readFeedLayout(), showLastSync: true, recordHistory: true, hideShorts: true, markWatchedOnClose: true, syncIntervalMinutes: 30, playingVideoId: null, selectingChannels: false, selectedChannels: new Set(), settings: {} };
 const t = createTranslator(() => state.language);
 
 let noticeTimer;
@@ -82,6 +82,11 @@ function applyTranslations() {
   });
   $('#show-last-sync').setAttribute('aria-checked', String(state.showLastSync));
   $('#record-history').setAttribute('aria-checked', String(state.recordHistory));
+  $('#hide-shorts').setAttribute('aria-checked', String(state.hideShorts));
+  $('#mark-watched-on-close').setAttribute('aria-checked', String(state.markWatchedOnClose));
+  document.querySelectorAll('[data-sync-interval]').forEach((button) => {
+    button.setAttribute('aria-checked', String(Number(button.dataset.syncInterval) === state.syncIntervalMinutes));
+  });
   document.querySelector('.nav-item[data-view="history"]').classList.toggle('hidden', !state.recordHistory);
   $('#theme-icon').textContent = state.theme === 'dark' ? '☀' : '☾';
   document.body.dataset.theme = state.theme;
@@ -171,9 +176,12 @@ function showFeedEmpty(title, text) {
   $('#feed-empty p').textContent = text;
 }
 
+const feedLayouts = ['grid', 'list', 'rows'];
+
 function readFeedLayout() {
   try {
-    return localStorage.getItem(feedLayoutStorageKey) === 'list' ? 'list' : 'grid';
+    const layout = localStorage.getItem(feedLayoutStorageKey);
+    return feedLayouts.includes(layout) ? layout : 'grid';
   } catch {
     return 'grid';
   }
@@ -185,10 +193,13 @@ function setFeedLayout(layout) {
     localStorage.setItem(feedLayoutStorageKey, layout);
   } catch {}
   renderFeedLayout();
+  if (state.videos.length) {
+    renderVideos();
+  }
 }
 
 function renderFeedLayout() {
-  $('#video-grid').classList.toggle('list', state.feedLayout === 'list');
+  $('#video-grid').className = state.feedLayout === 'rows' ? 'video-rows' : `video-grid${state.feedLayout === 'list' ? ' list' : ''}`;
   document.querySelectorAll('[data-layout]').forEach((button) => {
     button.setAttribute('aria-checked', String(button.dataset.layout === state.feedLayout));
   });
@@ -204,7 +215,59 @@ function renderVideos() {
     return;
   }
   $('#feed-empty').classList.add('hidden');
-  $('#video-grid').innerHTML = state.videos.map((video) => videoCard(video, t, formatDate)).join('');
+  $('#video-grid').innerHTML = state.feedLayout === 'rows' ? channelRowsHtml() : dayGroupsHtml();
+}
+
+function localDayKey(value) {
+  const date = new Date(value);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function dayLabel(value) {
+  const today = new Date();
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+  const key = localDayKey(value);
+  if (key === localDayKey(today)) {
+    return t('today');
+  }
+  if (key === localDayKey(yesterday)) {
+    return t('yesterday');
+  }
+  const date = new Date(value);
+  const options = { weekday: 'long', day: 'numeric', month: 'long' };
+  if (date.getFullYear() !== today.getFullYear()) {
+    options.year = 'numeric';
+  }
+  const label = new Intl.DateTimeFormat(state.language === 'pt-BR' ? 'pt-BR' : 'en-US', options).format(date);
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function dayGroupsHtml() {
+  let currentDay = null;
+  return state.videos.map((video) => {
+    const day = video.published_at ? localDayKey(video.published_at) : '';
+    const heading = day !== currentDay ? `<h2 class="video-day">${escapeHtml(video.published_at ? dayLabel(video.published_at) : '')}</h2>` : '';
+    currentDay = day;
+    return heading + videoCard(video, t, formatDate);
+  }).join('');
+}
+
+function channelRowsHtml() {
+  const rows = new Map();
+  for (const video of state.videos) {
+    if (!rows.has(video.channel_id)) {
+      rows.set(video.channel_id, []);
+    }
+    rows.get(video.channel_id).push(video);
+  }
+  return [...rows.values()].map((videos) => `<section class="video-row">
+    <h2 class="video-row-title"><img src="${escapeHtml(videos[0].channel_thumbnail || '/logo.svg')}" alt="">${escapeHtml(videos[0].channel_title)}<span>${videos.length}</span></h2>
+    <div class="video-row-viewport">
+      <button type="button" class="row-scroll row-scroll-left" data-scroll-row="-1" aria-label="${escapeHtml(t('scrollLeft'))}">‹</button>
+      <div class="video-row-track">${videos.map((video) => videoCard(video, t, formatDate)).join('')}</div>
+      <button type="button" class="row-scroll row-scroll-right" data-scroll-row="1" aria-label="${escapeHtml(t('scrollRight'))}">›</button>
+    </div>
+  </section>`).join('');
 }
 
 function renderSettings() {
@@ -344,6 +407,7 @@ function openPlayer(videoId) {
   if (state.recordHistory) {
     postJson('/api/history', { videoId, state: 'opened' }).catch(() => {});
   }
+  state.playingVideoId = videoId;
   $('#player-title').textContent = video.title;
   $('#player-channel').textContent = video.channel_title;
   $('#youtube-link').href = `https://www.youtube.com/watch?v=${encodeURIComponent(video.video_id)}`;
@@ -366,7 +430,7 @@ function readCachedPreferences() {
 
 function cachePreferences() {
   try {
-    localStorage.setItem(preferenceStorageKey, JSON.stringify({ language: state.language, theme: state.theme, showLastSync: state.showLastSync, recordHistory: state.recordHistory }));
+    localStorage.setItem(preferenceStorageKey, JSON.stringify({ language: state.language, theme: state.theme, showLastSync: state.showLastSync, recordHistory: state.recordHistory, hideShorts: state.hideShorts, markWatchedOnClose: state.markWatchedOnClose, syncIntervalMinutes: state.syncIntervalMinutes }));
   } catch {}
 }
 
@@ -498,6 +562,25 @@ async function deleteHistory(videoIds) {
   }
 }
 
+async function clearCache() {
+  const confirmed = await confirmAction({ title: t('clearCacheConfirmTitle'), message: t('clearCacheConfirm'), confirmLabel: t('clearCacheButton') });
+  if (!confirmed) {
+    return;
+  }
+  const button = $('#clear-cache');
+  button.disabled = true;
+  try {
+    const result = await postJson('/api/cache/clear');
+    await loadChannels();
+    await loadVideos();
+    setNotice(t('cacheCleared', result.removed), result.errors?.length ? 'warning' : 'success');
+  } catch (error) {
+    showError(error);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function confirmAction({ title, message, confirmLabel }) {
   const dialog = $('#confirm-dialog');
   $('#confirm-title').textContent = title;
@@ -556,6 +639,25 @@ function bindEvents() {
   $('#channel-form').addEventListener('submit', submitChannel);
   $('#cancel-channel').addEventListener('click', () => $('#channel-dialog').close());
   $('#save-api-key').addEventListener('click', saveApiKey);
+  $('#hide-shorts').addEventListener('click', async () => {
+    state.hideShorts = !state.hideShorts;
+    $('#hide-shorts').setAttribute('aria-checked', String(state.hideShorts));
+    await savePreference('hideShorts', state.hideShorts);
+    await postJson('/api/sync').catch(() => {});
+    await loadChannels().catch(showError);
+    await loadVideos().catch(showError);
+  });
+  $('#mark-watched-on-close').addEventListener('click', async () => {
+    state.markWatchedOnClose = !state.markWatchedOnClose;
+    $('#mark-watched-on-close').setAttribute('aria-checked', String(state.markWatchedOnClose));
+    await savePreference('markWatchedOnClose', state.markWatchedOnClose);
+  });
+  document.querySelectorAll('[data-sync-interval]').forEach((button) => button.addEventListener('click', async () => {
+    state.syncIntervalMinutes = Number(button.dataset.syncInterval);
+    applyTranslations();
+    await savePreference('syncIntervalMinutes', state.syncIntervalMinutes);
+  }));
+  $('#clear-cache').addEventListener('click', clearCache);
   $('#record-history').addEventListener('click', async () => {
     state.recordHistory = !state.recordHistory;
     applyTranslations();
@@ -564,8 +666,6 @@ function bindEvents() {
   $('#show-last-sync').addEventListener('click', async () => {
     state.showLastSync = !state.showLastSync;
     $('#show-last-sync').setAttribute('aria-checked', String(state.showLastSync));
-  $('#record-history').setAttribute('aria-checked', String(state.recordHistory));
-  document.querySelector('.nav-item[data-view="history"]').classList.toggle('hidden', !state.recordHistory);
     renderLastSync();
     await savePreference('showLastSync', state.showLastSync);
   });
@@ -629,6 +729,12 @@ function bindEvents() {
       toggleWatched(watchToggle);
       return;
     }
+    const scrollRow = event.target.closest('[data-scroll-row]');
+    if (scrollRow) {
+      const track = scrollRow.parentElement.querySelector('.video-row-track');
+      track.scrollBy({ left: Number(scrollRow.dataset.scrollRow) * track.clientWidth * 0.9, behavior: 'smooth' });
+      return;
+    }
     const deleteOne = event.target.closest('[data-delete-one]');
     if (deleteOne) {
       deleteHistory([deleteOne.dataset.deleteOne]);
@@ -660,10 +766,22 @@ function bindEvents() {
 
   window.addEventListener('popstate', () => setView(viewFromUrl(), { updateUrl: false }));
 
-  $('#player-dialog').addEventListener('close', () => {
+  document.querySelectorAll('dialog.modal').forEach((dialog) => dialog.addEventListener('click', (event) => {
+    const box = dialog.getBoundingClientRect();
+    const outside = event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom;
+    if (event.target === dialog && outside) {
+      dialog.close();
+    }
+  }));
+  $('#player-dialog').addEventListener('close', async () => {
     state.player?.destroy?.();
     state.player = null;
     $('#player-frame').innerHTML = '';
+    const videoId = state.playingVideoId;
+    state.playingVideoId = null;
+    if (videoId && state.markWatchedOnClose) {
+      await postJson('/api/history/mark', { videoId }).catch(() => {});
+    }
     const reload = state.view === 'history' ? loadHistory : loadVideos;
     reload().catch(showError);
   });
@@ -676,6 +794,9 @@ async function start() {
   state.theme = cached.theme || 'light';
   state.showLastSync = cached.showLastSync !== false;
   state.recordHistory = cached.recordHistory !== false;
+  state.hideShorts = cached.hideShorts !== false;
+  state.markWatchedOnClose = cached.markWatchedOnClose !== false;
+  state.syncIntervalMinutes = Number.isInteger(cached.syncIntervalMinutes) ? cached.syncIntervalMinutes : 30;
   applyTranslations();
   renderFeedLayout();
   showView(availableView(state.view));
@@ -687,6 +808,9 @@ async function start() {
     state.theme = state.settings.theme || state.theme;
     state.showLastSync = state.settings.showLastSync !== false;
     state.recordHistory = state.settings.recordHistory !== false;
+    state.hideShorts = state.settings.hideShorts !== false;
+    state.markWatchedOnClose = state.settings.markWatchedOnClose !== false;
+    state.syncIntervalMinutes = state.settings.syncIntervalMinutes ?? 30;
     cachePreferences();
     applyTranslations();
     await loadChannels();

@@ -5,13 +5,20 @@ const unavailableTitles = new Set(['Deleted video', 'Private video']);
 const channelIdPattern = /^UC[\w-]{22}$/;
 const handlePattern = /^@?[\w.-]{3,30}$/;
 const youtubeHosts = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com']);
+const videoThumbnailSizes = ['maxres', 'standard', 'high', 'medium', 'default'];
+const channelThumbnailSizes = ['medium', 'high', 'default'];
+
+function bestThumbnail(thumbnails, sizes) {
+  const size = sizes.find((name) => thumbnails?.[name]?.url);
+  return size ? thumbnails[size].url : null;
+}
 
 function toChannel(item) {
   return {
     channelId: item.id,
     title: item.snippet?.title || 'YouTube channel',
     handle: item.snippet?.customUrl || null,
-    thumbnailUrl: item.snippet?.thumbnails?.default?.url || null,
+    thumbnailUrl: bestThumbnail(item.snippet?.thumbnails, channelThumbnailSizes),
     uploadsPlaylistId: item.contentDetails?.relatedPlaylists?.uploads || null
   };
 }
@@ -21,7 +28,7 @@ function toVideo(item) {
     videoId: item.contentDetails?.videoId || item.snippet?.resourceId?.videoId,
     title: item.snippet?.title || 'Untitled video',
     description: item.snippet?.description || '',
-    thumbnailUrl: item.snippet?.thumbnails?.medium?.url || item.snippet?.thumbnails?.default?.url || null,
+    thumbnailUrl: bestThumbnail(item.snippet?.thumbnails, videoThumbnailSizes),
     publishedAt: item.contentDetails?.videoPublishedAt || item.snippet?.publishedAt || null
   };
 }
@@ -74,6 +81,9 @@ export function createYouTubeClient({ settings, fetch = globalThis.fetch }) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       const quotaExceeded = quotaReasons.has(data?.error?.errors?.[0]?.reason);
+      if (response.status === 404) {
+        throw new HttpError(404, data?.error?.message || 'Not found on YouTube.');
+      }
       throw new HttpError(quotaExceeded ? 429 : 502, quotaExceeded
         ? 'YouTube API quota exceeded. Try again after the quota resets.'
         : data?.error?.message || `YouTube API returned ${response.status}.`);
@@ -101,6 +111,18 @@ export function createYouTubeClient({ settings, fetch = globalThis.fetch }) {
         .filter((item) => !unavailableTitles.has(item.snippet?.title))
         .map(toVideo)
         .filter((video) => video.videoId);
+    },
+
+    async listRecentShortIds(channelId) {
+      try {
+        const data = await request('playlistItems', { part: 'contentDetails', playlistId: `UUSH${channelId.slice(2)}`, maxResults: '50' });
+        return (data.items || []).map((item) => item.contentDetails?.videoId).filter(Boolean);
+      } catch (error) {
+        if (error.status === 404) {
+          return [];
+        }
+        throw error;
+      }
     }
   };
 }

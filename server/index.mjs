@@ -12,7 +12,9 @@ const config = readConfig(process.env, rootDir);
 
 process.umask(0o077);
 const db = openDatabase(config.dataDir);
-const server = http.createServer(createApp(createContainer({ db, config })));
+const container = createContainer({ db, config });
+const server = http.createServer(createApp(container));
+container.sync.startScheduler({ onError: (error) => console.error('Scheduled sync failed:', error.message) });
 
 server.listen(config.port, config.host, () => {
   console.log(`TubeQueue is running at http://${config.host}:${config.port}`);

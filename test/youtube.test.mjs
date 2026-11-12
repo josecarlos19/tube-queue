@@ -77,3 +77,23 @@ test('maps uploads and skips deleted and private videos', async () => {
   const videos = await createYouTubeClient({ settings: fakeSettings(), fetch }).listRecentUploads('UU1');
   assert.deepEqual(videos, [{ videoId: 'v1', title: 'Hello', description: 'd', thumbnailUrl: 'm.jpg', publishedAt: '2026-11-01T00:00:00Z' }]);
 });
+
+test('picks the largest available video thumbnail', async () => {
+  const thumbnails = { default: { url: 'd.jpg' }, medium: { url: 'm.jpg' }, high: { url: 'h.jpg' }, standard: { url: 's.jpg' } };
+  const { fetch } = fakeFetch(() => ({ body: { items: [
+    { snippet: { title: 'A', thumbnails }, contentDetails: { videoId: 'v1' } },
+    { snippet: { title: 'B', thumbnails: { ...thumbnails, maxres: { url: 'x.jpg' } } }, contentDetails: { videoId: 'v2' } }
+  ] } }));
+  const videos = await createYouTubeClient({ settings: fakeSettings(), fetch }).listRecentUploads('UU1');
+  assert.deepEqual(videos.map((video) => video.thumbnailUrl), ['s.jpg', 'x.jpg']);
+});
+
+test('lists short IDs from the channel shorts playlist and treats a missing one as empty', async () => {
+  const { fetch, requests } = fakeFetch((url, count) => count === 1
+    ? { body: { items: [{ contentDetails: { videoId: 's1' } }, { contentDetails: {} }] } }
+    : { status: 404, body: { error: { message: 'playlistNotFound' } } });
+  const youtube = createYouTubeClient({ settings: fakeSettings(), fetch });
+  assert.deepEqual(await youtube.listRecentShortIds(channelId), ['s1']);
+  assert.equal(requests[0].searchParams.get('playlistId'), `UUSH${channelId.slice(2)}`);
+  assert.deepEqual(await youtube.listRecentShortIds(channelId), []);
+});

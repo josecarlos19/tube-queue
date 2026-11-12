@@ -7,7 +7,7 @@ import { channel, createFakeYouTube, video } from './helpers.mjs';
 
 function setup(youtube, clock = { now: new Date('2026-11-10T12:00:00Z') }) {
   const repository = createRepository(openMemoryDatabase());
-  const sync = createSyncService({ repository, youtube, intervalMs: 30 * 60_000, concurrency: 2, now: () => clock.now });
+  const sync = createSyncService({ repository, youtube, intervalMs: () => 30 * 60_000, concurrency: 2, now: () => clock.now });
   return { repository, sync, clock };
 }
 
@@ -49,4 +49,48 @@ test('concurrent callers share one run', async () => {
   const [first, second] = await Promise.all([sync.syncStale(true), sync.syncStale(true)]);
   assert.equal(first, second);
   assert.equal(youtube.calls.filter(([name]) => name === 'listRecentUploads').length, 3);
+});
+
+test('with shorts hidden, they are never saved and cached unwatched ones are removed', async () => {
+  const youtube = createFakeYouTube({
+    uploads: { UUa: [video('long', '2026-11-09T00:00:00Z'), video('short', '2026-11-10T00:00:00Z'), video('watched-short', '2026-11-08T00:00:00Z')] },
+    shorts: { a: ['short', 'watched-short'] }
+  });
+  const repository = createRepository(openMemoryDatabase());
+  const settings = { hideShorts: false };
+  const sync = createSyncService({ repository, youtube, intervalMs: () => 0, concurrency: 1, hideShorts: () => settings.hideShorts });
+  repository.upsertChannel(channel('a'), '2026-11-01T00:00:00Z');
+
+  await sync.syncStale(true);
+  assert.equal(youtube.calls.some(([name]) => name === 'listRecentShortIds'), false);
+  assert.deepEqual(repository.searchVideos({}).map((row) => row.video_id), ['short', 'long', 'watched-short']);
+  repository.markWatched('watched-short', '2026-11-10T00:00:00Z');
+
+  settings.hideShorts = true;
+  await sync.syncStale(true);
+  assert.deepEqual(repository.searchVideos({}).map((row) => row.video_id), ['long', 'watched-short']);
+});
+
+test('an interval of zero turns off automatic syncs but manual ones still run', async () => {
+  const youtube = createFakeYouTube();
+  const repository = createRepository(openMemoryDatabase());
+  const sync = createSyncService({ repository, youtube, intervalMs: () => 0, concurrency: 1 });
+  repository.upsertChannel(channel('a'), '2026-11-01T00:00:00Z');
+  assert.deepEqual(await sync.syncStale(), { synced: 0, errors: [] });
+  assert.equal((await sync.syncStale(true)).synced, 1);
+});
+
+test('the scheduler syncs stale channels on start and on every tick', async (t) => {
+  const youtube = createFakeYouTube();
+  const clock = { now: new Date('2026-11-10T12:00:00Z') };
+  const { repository, sync } = setup(youtube, clock);
+  repository.upsertChannel(channel('a'), '2026-11-01T00:00:00Z');
+  const stop = sync.startScheduler({ tickMs: 10 });
+  t.after(stop);
+  const uploadCalls = () => youtube.calls.filter(([name]) => name === 'listRecentUploads').length;
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  assert.equal(uploadCalls(), 1);
+  clock.now = new Date('2026-11-10T12:31:00Z');
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  assert.equal(uploadCalls(), 2);
 });

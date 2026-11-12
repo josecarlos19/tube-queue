@@ -18,7 +18,6 @@ export function readConfig(env, rootDir) {
     dataDir: path.resolve(env.DATA_DIR || path.join(rootDir, 'data')),
     publicDir: path.join(rootDir, 'public'),
     baseUrl: (env.APP_BASE_URL || `http://localhost:${port}`).trim().replace(/\/$/, ''),
-    syncIntervalMs: 30 * 60 * 1000,
     syncConcurrency: 4,
     credentialDefaults: {
       apiKey: env.YOUTUBE_API_KEY || ''

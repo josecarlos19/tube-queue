@@ -18,6 +18,8 @@ export function createRepository(db) {
       channel_id=excluded.channel_id, title=excluded.title, description=excluded.description,
       thumbnail_url=excluded.thumbnail_url, published_at=excluded.published_at, cached_at=excluded.cached_at
   `);
+  const deleteUnwatchedVideo = db.prepare(`DELETE FROM videos WHERE video_id = ? AND channel_id = ?
+    AND video_id NOT IN (SELECT video_id FROM watch_history)`);
   const markSynced = db.prepare('UPDATE channels SET last_synced_at = ?, sync_error = NULL WHERE channel_id = ?');
   const deleteHistoryEntry = db.prepare('DELETE FROM watch_history WHERE video_id = ?');
 
@@ -45,10 +47,13 @@ export function createRepository(db) {
       const statement = db.prepare('DELETE FROM channels WHERE channel_id = ?');
       return transaction(() => channelIds.reduce((deleted, channelId) => deleted + Number(statement.run(channelId).changes), 0));
     },
-    saveUploads(channelId, videos, syncedAt) {
+    saveUploads(channelId, videos, syncedAt, discardedVideoIds = []) {
       transaction(() => {
         for (const video of videos) {
           upsertVideo.run(video.videoId, channelId, video.title, video.description, video.thumbnailUrl, video.publishedAt, syncedAt);
+        }
+        for (const videoId of discardedVideoIds) {
+          deleteUnwatchedVideo.run(videoId, channelId);
         }
         markSynced.run(syncedAt, channelId);
       });
@@ -57,6 +62,13 @@ export function createRepository(db) {
       db.prepare('UPDATE channels SET sync_error = ? WHERE channel_id = ?').run(message, channelId);
     },
 
+    clearVideoCache() {
+      return transaction(() => {
+        const removed = Number(db.prepare('DELETE FROM videos WHERE video_id NOT IN (SELECT video_id FROM watch_history)').run().changes);
+        db.prepare('UPDATE channels SET last_synced_at = NULL').run();
+        return removed;
+      });
+    },
     searchVideos({ channelId, query }) {
       const conditions = [];
       const values = [];

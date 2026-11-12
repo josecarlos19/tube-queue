@@ -16,7 +16,7 @@ export function video(videoId, publishedAt, overrides = {}) {
   return { videoId, title: `Video ${videoId}`, description: '', thumbnailUrl: null, publishedAt, ...overrides };
 }
 
-export function createFakeYouTube({ channels = [], uploads = {}, failingPlaylists = new Set() } = {}) {
+export function createFakeYouTube({ channels = [], uploads = {}, shorts = {}, failingPlaylists = new Set() } = {}) {
   const calls = [];
   return {
     calls,
@@ -34,6 +34,10 @@ export function createFakeYouTube({ channels = [], uploads = {}, failingPlaylist
         throw new Error(`Playlist ${playlistId} failed`);
       }
       return uploads[playlistId] || [];
+    },
+    async listRecentShortIds(channelId) {
+      calls.push(['listRecentShortIds', channelId]);
+      return shorts[channelId] || [];
     }
   };
 }

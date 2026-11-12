@@ -20,9 +20,11 @@
 
 ## Features
 
-- 📺 **One chronological feed** of the channels you add, in grid or list view
+- 📺 **One chronological feed** of the channels you add, grouped by day, in grid, list or channel rows
+- 🚫 **No Shorts**, unless you want them
+- 🔄 **Background sync** on a schedule you pick
 - ▶️ **Built-in player**, with a link to YouTube for likes and comments
-- ✅ **Watch tracking** and a **history** you can filter by date
+- ✅ **Watch tracking** and an optional **history** you can filter by date
 - 🔎 **Instant search** across videos and channels
 - 📥 **CSV import/export** of your channel list
 - 🌗 **Light and dark themes**, in English and Brazilian Portuguese

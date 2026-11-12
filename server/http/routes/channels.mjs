@@ -63,6 +63,13 @@ export function channelRoutes({ repository, sync, addChannel, importChannels }) 
       async handler({ res }) {
         json(res, 200, await sync.syncStale(true));
       }
+    },
+    {
+      method: 'POST', path: '/api/cache/clear',
+      async handler({ res }) {
+        const removed = repository.clearVideoCache();
+        json(res, 200, { removed, ...await sync.syncStale(true) });
+      }
     }
   ];
 }

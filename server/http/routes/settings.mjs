@@ -2,6 +2,7 @@ import { json, readJson } from '../respond.mjs';
 
 const languages = ['en', 'pt-BR'];
 const themes = ['light', 'dark'];
+export const syncIntervals = [0, 15, 30, 60, 180];
 
 export function settingsRoutes({ settings }) {
   const payload = () => ({
@@ -9,7 +10,10 @@ export function settingsRoutes({ settings }) {
     language: settings.language(),
     theme: settings.theme(),
     showLastSync: settings.showLastSync(),
-    recordHistory: settings.recordHistory()
+    recordHistory: settings.recordHistory(),
+    hideShorts: settings.hideShorts(),
+    markWatchedOnClose: settings.markWatchedOnClose(),
+    syncIntervalMinutes: settings.syncIntervalMinutes()
   });
 
   return [
@@ -37,6 +41,15 @@ export function settingsRoutes({ settings }) {
         }
         if (typeof body.recordHistory === 'boolean') {
           settings.save('record_history', body.recordHistory);
+        }
+        if (typeof body.hideShorts === 'boolean') {
+          settings.save('hide_shorts', body.hideShorts);
+        }
+        if (typeof body.markWatchedOnClose === 'boolean') {
+          settings.save('mark_watched_on_close', body.markWatchedOnClose);
+        }
+        if (syncIntervals.includes(body.syncIntervalMinutes)) {
+          settings.save('sync_interval_minutes', body.syncIntervalMinutes);
         }
         json(res, 200, payload());
       }

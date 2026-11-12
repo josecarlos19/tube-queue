@@ -13,6 +13,9 @@ export function createSettingsStore(db, credentialDefaults) {
     language: () => get('language', 'en'),
     theme: () => get('theme', 'light'),
     showLastSync: () => get('show_last_sync', 'true') === 'true',
-    recordHistory: () => get('record_history', 'true') === 'true'
+    recordHistory: () => get('record_history', 'true') === 'true',
+    hideShorts: () => get('hide_shorts', 'true') === 'true',
+    markWatchedOnClose: () => get('mark_watched_on_close', 'true') === 'true',
+    syncIntervalMinutes: () => Number(get('sync_interval_minutes', '30'))
   };
 }

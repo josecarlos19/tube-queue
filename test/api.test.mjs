@@ -228,6 +228,41 @@ test('with history turned off, playback is not recorded but marking as watched s
   assert.deepEqual(recorded.data, { ok: true, recorded: true });
 });
 
+test('shorts are left out of the feed by default and come back when the setting is off', async (t) => {
+  const youtube = youtubeWithChannels();
+  youtube.listRecentShortIds = async (channelId) => (channelId === alphaId ? ['a2'] : []);
+  const app = await startTestApp({ youtube });
+  t.after(app.close);
+  await addBoth(app);
+  assert.equal((await app.request('GET', '/api/settings')).data.hideShorts, true);
+  assert.deepEqual((await app.request('GET', '/api/videos')).data.videos.map((row) => row.video_id), ['b1', 'a1']);
+
+  await app.request('POST', '/api/settings', { body: { hideShorts: false } });
+  await app.request('POST', '/api/sync');
+  assert.deepEqual((await app.request('GET', '/api/videos')).data.videos.map((row) => row.video_id), ['a2', 'b1', 'a1']);
+});
+
+test('sync interval accepts only the offered values', async (t) => {
+  const app = await startTestApp();
+  t.after(app.close);
+  assert.equal((await app.request('GET', '/api/settings')).data.syncIntervalMinutes, 30);
+  assert.equal((await app.request('POST', '/api/settings', { body: { syncIntervalMinutes: 7 } })).data.syncIntervalMinutes, 30);
+  assert.equal((await app.request('POST', '/api/settings', { body: { syncIntervalMinutes: 0 } })).data.syncIntervalMinutes, 0);
+});
+
+test('clearing the cache keeps videos in history and refills the feed', async (t) => {
+  const app = await startTestApp({ youtube: youtubeWithChannels() });
+  t.after(app.close);
+  await addBoth(app);
+  await app.request('POST', '/api/history', { body: { videoId: 'a1', state: 'opened' } });
+  const cleared = await app.request('POST', '/api/cache/clear');
+  assert.equal(cleared.status, 200);
+  assert.equal(cleared.data.removed, 2);
+  assert.equal(cleared.data.synced, 2);
+  assert.deepEqual((await app.request('GET', '/api/videos')).data.videos.map((row) => row.video_id), ['a2', 'b1', 'a1']);
+  assert.equal((await app.request('GET', '/api/history')).data.history.length, 1);
+});
+
 test('settings never return the API key', async (t) => {
   const app = await startTestApp();
   t.after(app.close);

@@ -8,7 +8,7 @@ export function createContainer({ db, config, fetch = globalThis.fetch, now = ()
   const settings = createSettingsStore(db, config.credentialDefaults);
   const repository = createRepository(db);
   const youtube = overrides.youtube ?? createYouTubeClient({ settings, fetch });
-  const sync = createSyncService({ repository, youtube, intervalMs: config.syncIntervalMs, concurrency: config.syncConcurrency, now });
+  const sync = createSyncService({ repository, youtube, intervalMs: () => settings.syncIntervalMinutes() * 60_000, concurrency: config.syncConcurrency, hideShorts: settings.hideShorts, now });
   const addChannel = createChannelAdder({ youtube, repository, sync, now });
   const importChannels = createChannelImporter({ youtube, repository, sync, now });
   return { config, settings, repository, youtube, sync, addChannel, importChannels, now, logger };
