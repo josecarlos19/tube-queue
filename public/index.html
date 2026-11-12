@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en" data-loading>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f9f9f9">
+  <title>TubeQueue</title>
+  <link rel="icon" href="/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/vendor/air-datepicker/air-datepicker.css">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <button class="brand" id="home-button" aria-label="TubeQueue home">
+      <img src="/logo.svg" alt="" class="brand-logo">
+      <span class="brand-name">Tube<span>Queue</span></span>
+    </button>
+    <div class="top-actions">
+      <button class="icon-button" id="theme-toggle" aria-label="Toggle theme" title="Toggle theme"><span id="theme-icon">☾</span></button>
+      <button class="icon-button mobile-menu" id="menu-toggle" aria-label="Open menu">☰</button>
+    </div>
+  </header>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <nav class="main-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-view="feed"><span class="nav-icon">⌂</span><span data-i18n="feed">Feed</span></button>
+        <button class="nav-item" data-view="history"><span class="nav-icon">◷</span><span data-i18n="history">History</span></button>
+        <button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span data-i18n="settings">Settings</span></button>
+      </nav>
+      <div class="sidebar-divider"></div>
+      <div class="section-heading"><span data-i18n="yourChannels">Your channels</span><span class="section-actions"><button class="tiny-button icon-toggle" id="select-channels" data-i18n-title="select" aria-pressed="false"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 12l3 3 5-6"/></svg></button><button class="tiny-button" id="sidebar-add-channel" aria-label="Add channel" data-i18n-title="addChannel">+</button></span></div>
+      <div class="channel-bulk hidden" id="channel-bulk">
+        <label class="channel-bulk-all"><input class="channel-check" type="checkbox" id="select-all-channels"><span data-i18n="selectAll">Select all</span></label>
+        <div class="channel-bulk-actions"><button class="button button-secondary" id="cancel-channel-selection" data-i18n="cancel">Cancel</button><button class="button button-danger" id="delete-channels" disabled></button></div>
+      </div>
+      <div class="channel-list" id="sidebar-channels"></div>
+      <div class="sidebar-bottom"><span class="status-dot" id="api-status-dot"></span><span id="api-status">Checking API setup…</span></div>
+    </aside>
+    <main class="main-content">
+      <div class="notice hidden" id="notice" role="status"></div>
+      <section class="view" id="feed-view">
+        <div class="page-heading">
+          <div><p class="eyebrow" data-i18n="curatedByYou">CURATED BY YOU</p><h1 data-i18n="latestVideos">Latest videos</h1><p class="subheading" data-i18n="feedDescription">A chronological feed from the channels you add.</p><p class="last-sync hidden" id="last-sync"></p></div>
+          <div class="heading-actions"><button class="button button-secondary" id="refresh-button"><span>↻</span><span data-i18n="refresh">Refresh</span></button><button class="button button-primary" id="add-channel-button"><span>+</span><span data-i18n="addChannel">Add channel</span></button></div>
+        </div>
+        <div class="toolbar">
+          <label class="search-box"><span>⌕</span><input id="video-search" type="search" placeholder="Search videos or channels" data-i18n-placeholder="searchPlaceholder"></label>
+          <div class="combobox" id="channel-filter"></div>
+          <div class="segmented layout-toggle" role="radiogroup" aria-label="Layout" data-i18n-title="layout">
+            <button type="button" role="radio" data-layout="grid" data-i18n-title="gridLayout"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg></button>
+            <button type="button" role="radio" data-layout="list" data-i18n-title="listLayout"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="7" height="6" rx="1.5"/><rect x="3" y="14" width="7" height="6" rx="1.5"/><path d="M14 6h7M14 9h4M14 16h7M14 19h4"/></svg></button>
+          </div>
+        </div>
+        <div class="video-grid" id="video-grid"></div>
+        <div class="empty-state hidden" id="feed-empty"><div class="empty-art">▶</div><h2 data-i18n="emptyFeedTitle">Your feed starts here</h2><p data-i18n="emptyFeedText">Add the channels you want to follow to fill this feed.</p><button class="button button-primary" data-i18n="addFirstChannel" id="add-first-channel">Add your first channel</button></div>
+      </section>
+      <section class="view hidden" id="history-view">
+        <div class="page-heading"><div><p class="eyebrow" data-i18n="yourActivity">YOUR ACTIVITY</p><h1 data-i18n="watchHistory">Watch history</h1><p class="subheading" data-i18n="historyDescription">Videos you opened or marked as watched.</p></div></div>
+        <div class="history-toolbar">
+          <label class="date-filter"><span data-i18n="period">Period</span><span class="date-range-field"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><input id="history-range" type="text" readonly autocomplete="off" placeholder="All dates" data-i18n-placeholder="allDates"></span></label>
+          <div class="toolbar-spacer"></div>
+          <button class="button button-danger hidden" id="delete-selected"><span data-i18n="deleteSelected">Delete selected</span> <span id="selected-count"></span></button>
+        </div>
+        <div class="history-list" id="history-list"></div>
+        <div class="empty-state hidden" id="history-empty"><div class="empty-art">◷</div><h2 data-i18n="emptyHistoryTitle">No history yet</h2><p data-i18n="emptyHistoryText">Open a video from your feed and it will show up here.</p></div>
+      </section>
+      <section class="view hidden" id="settings-view">
+        <div class="page-heading"><div><p class="eyebrow" data-i18n="personalSetup">PERSONAL SETUP</p><h1 data-i18n="settings">Settings</h1><p class="subheading" data-i18n="settingsDescription">Add your YouTube API key so TubeQueue can read public channel and video data.</p></div></div>
+        <div class="settings-layout">
+          <section class="settings-card">
+            <div class="settings-card-heading"><div class="settings-icon settings-icon-red">⌘</div><div><h2 data-i18n="apiKeyHeading">YouTube API key</h2><p id="api-key-status" class="settings-status"></p></div></div>
+            <p class="settings-copy" data-i18n="apiKeyExplanation">TubeQueue uses this key to find channels and fetch their latest uploads. Only public data is read.</p>
+            <label class="form-label" for="api-key-input" data-i18n="apiKeyLabel">API key</label><input id="api-key-input" class="text-input" type="password" autocomplete="new-password" placeholder="">
+            <p class="settings-hint" data-i18n="apiKeyHint">The key is stored locally in SQLite and used by the server only.</p>
+            <button class="button button-secondary" id="save-api-key" data-i18n="saveApiKey">Save API key</button>
+            <div class="settings-steps"><h3 data-i18n="apiKeyTutorialTitle">Create your own API key</h3><ol><li data-i18n="apiKeyStep1">Create or select a project in Google Cloud Console.</li><li data-i18n="apiKeyStep2">Enable YouTube Data API v3 in APIs & Services → Library.</li><li data-i18n="apiKeyStep3">Create credentials → API key, then restrict it to YouTube Data API v3.</li><li data-i18n="apiKeyStep4">Paste the key above and save. Keep it private.</li></ol><a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" data-i18n="openCloudConsole">Open Google Cloud Console ↗</a></div>
+          </section>
+          <section class="settings-card">
+            <div class="settings-card-heading"><div class="settings-icon">⇅</div><div><h2 data-i18n="channelsCsvHeading">Channels CSV</h2><p id="channels-csv-status" class="settings-status"></p></div></div>
+            <p class="settings-copy" data-i18n="channelsCsvExplanation">Export your saved channels or import a list. Each row needs a channel @handle, channel URL or channel ID in the "channel" column. Only valid channels are added.</p>
+            <div class="button-row">
+              <a class="button button-secondary" id="export-channels" href="/api/channels/export" download data-i18n="exportCsv">Export CSV</a>
+              <a class="button button-secondary" id="download-template" href="/api/channels/template" download data-i18n="downloadTemplate">Download template</a>
+              <button class="button button-primary" id="import-channels-button" data-i18n="importCsv">Import CSV</button>
+              <input id="import-channels-file" class="hidden" type="file" accept=".csv,text/csv">
+            </div>
+            <div class="settings-steps hidden" id="import-report"><h3 id="import-report-title"></h3><ol id="import-report-list"></ol></div>
+          </section>
+          <section class="settings-card">
+            <div class="settings-card-heading"><div class="settings-icon">⚙</div><div><h2 data-i18n="preferencesHeading">Preferences</h2></div></div>
+            <p class="form-label" id="language-label" data-i18n="language">Language</p>
+            <div class="segmented" role="radiogroup" aria-labelledby="language-label">
+              <button type="button" role="radio" data-language="en">English</button>
+              <button type="button" role="radio" data-language="pt-BR">Português (Brasil)</button>
+            </div>
+            <div class="setting-row">
+              <div><p class="setting-row-title" id="show-last-sync-label" data-i18n="showLastSync">Show last sync time</p><p class="settings-hint" data-i18n="showLastSyncHint">Shown under the feed title.</p></div>
+              <button type="button" class="switch" id="show-last-sync" role="switch" aria-checked="true" aria-labelledby="show-last-sync-label"><span></span></button>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+  <dialog class="modal" id="channel-dialog">
+    <form method="dialog" class="modal-close-form"><button class="icon-button" aria-label="Close">×</button></form>
+    <form id="channel-form">
+      <div class="modal-icon">+</div>
+      <h2 data-i18n="addChannel">Add channel</h2>
+      <p class="modal-copy" data-i18n="addChannelText">Paste a channel @handle, channel URL or channel ID.</p>
+      <label class="form-label" for="channel-input" data-i18n="channelInputLabel">Channel</label>
+      <input id="channel-input" class="text-input" type="text" autocomplete="off" required placeholder="@handle or https://www.youtube.com/@handle">
+      <p class="form-error hidden" id="channel-error" role="alert"></p>
+      <div class="modal-actions"><button class="button button-secondary" type="button" id="cancel-channel" data-i18n="cancel">Cancel</button><button class="button button-primary" type="submit" id="submit-channel" data-i18n="addChannel">Add channel</button></div>
+    </form>
+  </dialog>
+  <dialog class="modal" id="confirm-dialog">
+    <form method="dialog">
+      <div class="modal-icon modal-icon-danger"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg></div>
+      <h2 id="confirm-title"></h2>
+      <p class="modal-copy" id="confirm-message"></p>
+      <div class="modal-actions"><button class="button button-secondary" value="cancel" data-i18n="cancel">Cancel</button><button class="button button-danger" value="confirm" id="confirm-accept"></button></div>
+    </form>
+  </dialog>
+  <dialog class="modal player-modal" id="player-dialog">
+    <form method="dialog" class="modal-close-form"><button class="icon-button" aria-label="Close">×</button></form>
+    <div class="player-frame" id="player-frame"></div><div class="player-info"><div><p class="eyebrow" id="player-channel"></p><h2 id="player-title"></h2></div><a class="button button-secondary" id="youtube-link" target="_blank" rel="noopener noreferrer" data-i18n="openOnYoutube">Open on YouTube ↗</a></div>
+  </dialog>
+  <script async src="https://www.youtube.com/iframe_api"></script>
+  <script defer src="/vendor/air-datepicker/air-datepicker.js"></script>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+services:
+  tubequeue:
+    build: .
+    container_name: tubequeue
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8070:8070"
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8070
+      DATA_DIR: /data
+    volumes:
+      - ./data:/data
