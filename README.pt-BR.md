@@ -16,6 +16,13 @@
   <a href="LICENSE">Licença MIT</a>
 </p>
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/feed-dark.pt-BR.png">
+    <img src="docs/screenshots/feed-light.pt-BR.png" alt="Feed do TubeQueue" width="900">
+  </picture>
+</p>
+
 ---
 
 ## Recursos
